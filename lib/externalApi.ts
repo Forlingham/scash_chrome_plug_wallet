@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const baseUrl = '/ext'
+const baseUrl = 'https://test.scash.network/ext'
 
 const axiosTool = axios.create({
   baseURL: baseUrl,

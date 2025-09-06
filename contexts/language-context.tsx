@@ -281,7 +281,7 @@ const translations = {
   zh: {
     // Wallet Setup
     'wallet.title': 'SCASH 钱包',
-    'wallet.subtitle': '社区 web 钱包',
+    'wallet.subtitle': '社区 web 钱包1',
     'wallet.blockHeight': '区块高度',
     'wallet.available': '可用',
     'wallet.locked': '待确认',

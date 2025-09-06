@@ -117,6 +117,6 @@ export class AxiosTool {
 }
 
 export default new AxiosTool({
-  baseURL: '/api/',
+  baseURL: 'https://test.scash.network/api/',
   timeout: 30000
 })

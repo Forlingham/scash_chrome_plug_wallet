@@ -383,6 +383,7 @@ export const useWalletStore = create<WalletState>()(
 
       // 通过内存池中的记录来锁定交易
       setUpdateBalanceByMemPool: () => {
+  
         set((state) => {
           for (const tx of state.pendingTransactions) {
             if (tx.status === 'pending') {
@@ -396,11 +397,14 @@ export const useWalletStore = create<WalletState>()(
               for (const pickUnspent of tx.pickUnspents) {
                 const unspent = state.unspent.find((item) => item.txid === pickUnspent.txid)
                 if (unspent) {
-                  get().deleteUnspent(unspent.txid)
+                  // 在状态更新中直接过滤掉要删除的unspent
+                  state.unspent = state.unspent.filter(item => item.txid !== unspent.txid);
                 }
               }
             }
           }
+          
+  
 
           state.wallet.usableBalance = state.unspent
             .reduce((acc, cur) => {
@@ -432,7 +436,8 @@ export const useWalletStore = create<WalletState>()(
         transactions: state.transactions,
         isInitialized: state.isInitialized,
         isLocked: state.isLocked,
-        coinPrice: state.coinPrice
+        coinPrice: state.coinPrice,
+        // unspent: state.unspent
       })
     }
   )

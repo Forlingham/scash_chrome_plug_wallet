@@ -496,15 +496,9 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
             <div className="space-y-2">
               <Button 
                 className="w-full bg-gray-700 hover:bg-gray-600 text-white"
-                onClick={() => window.open('https://github.com/Forlingham/scash_web_wallet_next.js', '_blank')}
+                onClick={() => window.open('https://github.com/Forlingham/scash_chrome_plug_wallet', '_blank')}
               >
                 {t('common.contactSupportGitHub')}
-              </Button>
-              <Button 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                onClick={() => window.open('https://t.me/scash_webWallet', '_blank')}
-              >
-                {t('common.contactSupportTelegram')}
               </Button>
             </div>
           </CardContent>

@@ -7,7 +7,8 @@
     "build": "next build && node post-build.js",
     "start": "next start  -p 7021",
     "export": "next export",
-    "lint": "next lint"
+    "lint": "next lint",
+    "watch": "nodemon  --watch app --watch components --watch contexts  --watch docs --watch hooks --watch lib --watch public --watch stores --watch styles -e js,jsx,ts,tsx,css,json --exec \"npm run build\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -81,6 +82,7 @@
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "nodemon": "^3.1.10",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
