@@ -165,7 +165,7 @@ export function WalletAssets({ onNavigate }: WalletAssetsProps) {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search Transactions"
+            placeholder={t('assets.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
@@ -253,8 +253,8 @@ export function WalletAssets({ onNavigate }: WalletAssetsProps) {
 
       {filteredTransactions.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-gray-400">No transactions found</p>
-          <p className="text-gray-500 text-sm mt-1">Try adjusting your search or filter</p>
+          <p className="text-gray-400">{t('transaction.noTransactions')}</p>
+          <p className="text-gray-500 text-sm mt-1">{t('transaction.adjustFilter')}</p>
         </div>
       )}
     </div>

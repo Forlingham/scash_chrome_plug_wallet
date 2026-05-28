@@ -74,16 +74,14 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
         return (
           <div className="flex-1 flex items-center justify-center p-4">
             <div className="text-center">
-              <h2 className="text-xl font-semibold text-white mb-2">
-                {currentView.charAt(0).toUpperCase() + currentView.slice(1)} Feature
-              </h2>
-              <p className="text-gray-400 mb-4">This feature will be implemented soon.</p>
+              <h2 className="text-xl font-semibold text-white mb-2">{t('common.featureComingSoon')}</h2>
+              <p className="text-gray-400 mb-4">{t('common.featureComingSoonDesc')}</p>
               <Button
                 onClick={() => handleNavigation('home')}
                 variant="outline"
                 className="border-gray-600 text-gray-300 hover:bg-gray-700"
               >
-                Back to Home
+                {t('send.backToHome')}
               </Button>
             </div>
           </div>

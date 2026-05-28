@@ -122,8 +122,8 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       setMockMnemonic(walletObj.wallet!.mnemonic)
     } catch (error) {
       toast({
-        title: 'error',
-        description: 'An error occurred during the password verification process.',
+        title: t('common.error'),
+        description: t('settings.verifyFailed'),
         variant: 'destructive'
       })
     }
@@ -131,17 +131,45 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
 
   const copyMnemonic = () => {
     navigator.clipboard.writeText(mockMnemonic)
-    toast({ title: 'Copied to Clipboard', description: 'Recovery phrase has been copied to clipboard' })
+    toast({ title: t('settings.copyMnemonicSuccess'), description: t('settings.copyMnemonicDesc') })
   }
 
   const downloadBackup = () => {
     downloadWalletFile(wallet.encryptedWallet)
-    toast({ title: 'Backup Downloaded', description: 'Your wallet backup has been downloaded successfully' })
+    toast({ title: t('settings.backupDownloaded'), description: t('settings.backupDownloadedDesc') })
   }
 
   const onResetWallet = () => {
+    // 修复 1: 重置时保留用户自己配置的 RPC 节点 / 区块浏览器 / 语言偏好。
+    //   用户期望：重置只清掉钱包身份和缓存数据，他们花时间配的 RPC 节点
+    //   不应该被一并清掉。
+    const PRESERVED_KEYS = [
+      'scash-rpc-config', // 用户配置的 RPC 节点列表
+      'scash-explorer-config', // 区块浏览器/币价 URL
+      'language-storage' // 用户选择的语言
+    ]
+    const preserved: Record<string, string | null> = {}
+    for (const key of PRESERVED_KEYS) {
+      preserved[key] = localStorage.getItem(key)
+    }
+
     localStorage.clear()
+
+    for (const [key, value] of Object.entries(preserved)) {
+      if (value !== null) localStorage.setItem(key, value)
+    }
+
+    // 重新加载，让 zustand 持久化中间件按空数据初始化所有 store
     window.location.reload()
+  }
+
+  const handleConfirmReset = () => {
+    // 修复 2: 之前用 AlertDialogAction，第一次点击经常被 radix 内部
+    //   的 dialog 关闭逻辑吞掉，不触发 onClick；要点第二次才生效。
+    //   这里改成普通 Button + 显式关闭对话框，并用 setTimeout 让对话框
+    //   关闭的 state 更新先 commit，再触发 reload，避免 React 警告。
+    setShowResetDialog(false)
+    setTimeout(() => onResetWallet(), 0)
   }
 
   // ===== 各子视图 =====
@@ -233,7 +261,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         <div className="text-center mb-6">
           <Download className="h-12 w-12 text-purple-500 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-white">{t('settings.backup')}</h2>
-          <p className="text-gray-400 text-sm mt-2">Keep your recovery phrase and wallet file safe</p>
+          <p className="text-gray-400 text-sm mt-2">{t('settings.backupSubtitle')}</p>
         </div>
 
         <Card className="bg-gray-800 border-gray-700">
@@ -352,8 +380,8 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       <div className="flex-1 p-4 space-y-4 overflow-y-auto">
         <div className="text-center mb-6">
           <Shield className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">Security Settings</h2>
-          <p className="text-gray-400 text-sm mt-2">Manage your wallet security preferences</p>
+          <h2 className="text-xl font-bold text-white">{t('settings.security.title')}</h2>
+          <p className="text-gray-400 text-sm mt-2">{t('settings.security.subtitle')}</p>
         </div>
 
         <Card className="bg-gray-800 border-gray-700">
@@ -362,8 +390,8 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
               <div className="flex items-center gap-3">
                 <CheckCircle className="h-8 w-8 text-green-500" />
                 <div>
-                  <h3 className="text-white font-medium">Wallet Encrypted</h3>
-                  <p className="text-gray-400 text-sm">Your wallet is protected with a password</p>
+                  <h3 className="text-white font-medium">{t('settings.security.encrypted')}</h3>
+                  <p className="text-gray-400 text-sm">{t('settings.security.encryptedDesc')}</p>
                 </div>
               </div>
             </div>
@@ -376,8 +404,8 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
               <div className="flex items-center gap-3">
                 <CheckCircle className="h-8 w-8 text-green-500" />
                 <div>
-                  <h3 className="text-white font-medium">Recovery Phrase Secured</h3>
-                  <p className="text-gray-400 text-sm">Your 12-word recovery phrase is available for backup</p>
+                  <h3 className="text-white font-medium">{t('settings.security.recoverySecured')}</h3>
+                  <p className="text-gray-400 text-sm">{t('settings.security.recoverySecuredDesc')}</p>
                 </div>
               </div>
             </div>
@@ -390,7 +418,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
             className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 justify-start"
           >
             <Key className="h-4 w-4 mr-3" />
-            Change Password
+            {t('settings.changePassword')}
           </Button>
 
           <Button
@@ -398,12 +426,12 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
             className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 justify-start"
           >
             <Download className="h-4 w-4 mr-3" />
-            Backup Wallet
+            {t('settings.backup')}
           </Button>
 
           <Button onClick={onLockWallet} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white justify-start">
             <Lock className="h-4 w-4 mr-3" />
-            Lock Wallet Now
+            {t('settings.lock')}
           </Button>
         </div>
 
@@ -419,8 +447,8 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       <div className="flex-1 p-4 space-y-4 overflow-y-auto">
         <div className="text-center mb-6">
           <HelpCircle className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">Help & Support</h2>
-          <p className="text-gray-400 text-sm mt-2">Get help with your SCASH wallet</p>
+          <h2 className="text-xl font-bold text-white">{t('settings.help.title')}</h2>
+          <p className="text-gray-400 text-sm mt-2">{t('settings.help.subtitle')}</p>
         </div>
 
         <div className="space-y-3">
@@ -546,12 +574,10 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         </Button>
 
         <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-          <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="w-full">
-              <LogOut className="h-4 w-4 mr-2" />
-              {t('settings.reset')}
-            </Button>
-          </AlertDialogTrigger>
+          <Button variant="destructive" className="w-full" onClick={() => setShowResetDialog(true)}>
+            <LogOut className="h-4 w-4 mr-2" />
+            {t('settings.reset')}
+          </Button>
           <AlertDialogContent className="bg-gray-900 border-gray-700">
             <AlertDialogHeader>
               <AlertDialogTitle className="text-white flex items-center gap-2">
@@ -562,15 +588,17 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
                 {t('settings.resetConfirm')}
                 <br />
                 <span className="text-red-400 font-medium mt-2 block">{t('settings.resetConfirmInfo')}</span>
+                <br />
+                <span className="text-gray-400 text-xs mt-1 block">{t('settings.resetPreserveNote')}</span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
                 {t('common.cancel')}
               </AlertDialogCancel>
-              <AlertDialogAction onClick={onResetWallet} className="bg-red-600 hover:bg-red-700 text-white">
+              <Button onClick={handleConfirmReset} className="bg-red-600 hover:bg-red-700 text-white">
                 {t('common.confirm')}
-              </AlertDialogAction>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

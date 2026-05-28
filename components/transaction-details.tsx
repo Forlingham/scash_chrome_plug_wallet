@@ -44,7 +44,7 @@ export function TransactionDetails({ transaction, onNavigate }: TransactionDetai
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <Label className="text-green-400 text-sm">Sender Name</Label>
+                  <Label className="text-green-400 text-sm">{t('transaction.sender')}</Label>
                   <Button variant="ghost" size="sm" className="p-0 h-auto">
                     <Edit3 className="h-3 w-3 text-green-400" />
                   </Button>
@@ -73,7 +73,7 @@ export function TransactionDetails({ transaction, onNavigate }: TransactionDetai
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-green-400 text-sm">Amount in USD</Label>
+            <Label className="text-green-400 text-sm">{t('transaction.amountUsd')}</Label>
             <Button variant="ghost" size="sm" className="text-green-400">
               <Edit3 className="h-4 w-4" />
             </Button>
@@ -85,7 +85,7 @@ export function TransactionDetails({ transaction, onNavigate }: TransactionDetai
       {/* Current Price */}
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 space-y-3">
-          <Label className="text-green-400 text-sm">Amount at Current Price</Label>
+          <Label className="text-green-400 text-sm">{t('transaction.currentPrice')}</Label>
           <div className="flex items-center gap-2">
             <span className="text-xl font-semibold text-white">{transaction.currentPrice}</span>
             <span className="text-red-400 text-sm">({transaction.priceChange})</span>
@@ -104,7 +104,7 @@ export function TransactionDetails({ transaction, onNavigate }: TransactionDetai
       {/* Wallet Info */}
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 space-y-3">
-          <Label className="text-green-400 text-sm">Wallet</Label>
+          <Label className="text-green-400 text-sm">{t('transaction.wallet')}</Label>
           <div className="text-white font-medium">{transaction.wallet}</div>
         </CardContent>
       </Card>
@@ -134,7 +134,7 @@ export function TransactionDetails({ transaction, onNavigate }: TransactionDetai
           <Input
             defaultValue={transaction.note || "Tap to Add Note (Optional)"}
             className="bg-gray-900 border-gray-600 text-white placeholder-gray-400"
-            placeholder="Add a note..."
+            placeholder={t('transaction.addNote')}
           />
         </CardContent>
       </Card>

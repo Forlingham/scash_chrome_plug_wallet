@@ -175,8 +175,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
   const handleDownloadWallet = () => {
     if (!walletInfo || !walletInfo.encryptedWallet) {
       toast({
-        title: 'Error',
-        description: 'Wallet not encrypted',
+        title: t('common.error'),
+        description: t('setup.error.notEncrypted'),
         variant: 'destructive'
       })
       return
@@ -188,8 +188,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
     setWallet(walletInfo)
 
     toast({
-      title: 'Wallet Created Successfully',
-      description: 'Your wallet file has been downloaded. Keep it safe!'
+      title: t('setup.success.created'),
+      description: t('setup.success.createdDesc')
     })
 
     onWalletCreated()
@@ -216,15 +216,15 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
         } else {
           // 钱包文件有问题
           toast({
-            title: 'Invalid Wallet File',
-            description: 'The selected file is not a valid wallet file.',
+            title: t('setup.error.invalidWalletFile'),
+            description: t('setup.error.invalidWalletFileDesc'),
             variant: 'destructive'
           })
         }
       } catch (error) {
         toast({
-          title: 'Invalid Wallet File',
-          description: 'The selected file is not a valid wallet file.',
+          title: t('setup.error.invalidWalletFile'),
+          description: t('setup.error.invalidWalletFileDesc'),
           variant: 'destructive'
         })
       }
@@ -243,8 +243,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
 
     if (!uploadedWalletEncrypted) {
       toast({
-        title: 'Invalid Wallet File',
-        description: 'The selected file is not a valid wallet file.',
+        title: t('setup.error.invalidWalletFile'),
+        description: t('setup.error.invalidWalletFileDesc'),
         variant: 'destructive'
       })
       return
@@ -256,8 +256,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
 
       if (!decryptedWallet.isSuccess) {
         toast({
-          title: 'Invalid Password',
-          description: 'The password you entered is incorrect.',
+          title: t('setup.error.invalidPassword'),
+          description: t('setup.error.invalidPasswordDesc'),
           variant: 'destructive'
         })
         return
@@ -278,8 +278,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
       onWalletCreated()
     } catch (error) {
       toast({
-        title: 'Invalid Password',
-        description: 'The password you entered is incorrect.',
+        title: t('setup.error.invalidPassword'),
+        description: t('setup.error.invalidPasswordDesc'),
         variant: 'destructive'
       })
       return
@@ -326,8 +326,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
 
     navigator.clipboard.writeText(text)
     toast({
-      title: 'Copied to Clipboard',
-      description: 'Mnemonic phrase has been copied to clipboard.'
+      title: t('setup.copy.mnemonic'),
+      description: t('setup.copy.mnemonicDesc')
     })
   }
 
@@ -453,7 +453,7 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
                           setUserVerification(newVerification)
                         }}
                         className="bg-gray-900 border-gray-600 text-white"
-                        placeholder="Enter word"
+                        placeholder={t('setup.placeholder.enterWord')}
                       />
                     </div>
                   ))}

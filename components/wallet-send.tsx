@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label'
 import { useLanguage } from '@/contexts/language-context'
 import { useToast } from '@/hooks/use-toast'
 import { onBroadcastApi, Unspent } from '@/lib/api'
+import { buildRpcErrorToast } from '@/lib/rpc-error'
 import {
   calcAppFee,
   calcFee,
@@ -441,11 +442,12 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       })
 
       if (res.data.error) {
-        toast({
-          title: '错误码:' + res.data.error.error.code,
-          description: res.data.error.error.message,
-          variant: 'destructive'
-        })
+        const { title, description } = buildRpcErrorToast(
+          t,
+          res.data.error.error.message,
+          res.data.error.error.code
+        )
+        toast({ title, description, variant: 'destructive' })
         setIsConfirmLoading(false)
         return
       }
@@ -480,15 +482,17 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       toast({ title: t('send.success'), description: t('send.broadcast'), variant: 'success' })
     } catch (error: any) {
       console.log(error, 'error')
-      if (error?.data?.data?.success === false) {
-        toast({
-          title: t('send.error') + ': 500',
-          description: error?.data?.message || t('send.errorInfo'),
-          variant: 'destructive'
-        })
-        return
-      }
-      toast({ title: t('send.error'), description: t('send.errorInfo'), variant: 'destructive' })
+      // 走到这里通常是网络层抛错（HTTP 错误 / 节点全挂）。尝试从异常对象中
+      // 拿到 RPC 原始错误结构（如果是节点返回的业务错误也会被包到 error.data
+      // 里），交给 buildRpcErrorToast 翻译。
+      const nodeMsg = error?.data?.data?.error?.error?.message ?? error?.data?.message ?? error?.message
+      const nodeCode = error?.data?.data?.error?.error?.code ?? error?.data?.code ?? 0
+      const { title, description } = buildRpcErrorToast(t, nodeMsg, nodeCode)
+      toast({
+        title,
+        description: description || t('send.errorInfo'),
+        variant: 'destructive'
+      })
     } finally {
       setIsConfirmLoading(false)
       setShowConfirmDialog(false)
@@ -523,7 +527,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               <div className="space-y-4">
                 <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
                   <div className="flex flex-col space-y-2">
-                    <p className="text-purple-300 text-xs uppercase tracking-wide">Transaction ID</p>
+                    <p className="text-purple-300 text-xs uppercase tracking-wide">{t('transaction.id')}</p>
                     <p className="text-white text-sm font-mono break-all">{currentPendingTransaction.id}</p>
                     <button
                       onClick={() => onOpenExplorer('1', 'tx', currentPendingTransaction.id)}
@@ -549,11 +553,11 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                     <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm" key={index}>
                       <div className="flex justify-between items-center">
                         <div className="flex-1 min-w-0">
-                          <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">To</p>
+                          <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">{t('send.to')}</p>
                           <p className="text-white text-sm font-mono truncate">{hideString(item.address)}</p>
                         </div>
                         <div className="text-right ml-3">
-                          <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">Amount</p>
+                          <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">{t('common.amount')}</p>
                           <p className="text-white text-sm font-semibold">
                             {item.amount} {NAME_TOKEN}
                           </p>

@@ -344,6 +344,66 @@ const translations = {
     'wallet.invalidMnemonicWordCount': 'A 12-word phrase is required, you entered {n} words',
     'wallet.invalidMnemonicChecksum': 'One or more words are misspelled, or the order is wrong (BIP39 checksum failed).',
 
+    // ====== 重置 / 备份 / 安全 / 帮助 等设置页文案 ======
+    'settings.resetPreserveNote':
+      'Note: your custom RPC nodes, explorer URL and language preference will be preserved.',
+    'settings.copyMnemonicSuccess': 'Copied to Clipboard',
+    'settings.copyMnemonicDesc': 'Recovery phrase has been copied to clipboard.',
+    'settings.backupDownloaded': 'Backup Downloaded',
+    'settings.backupDownloadedDesc': 'Your wallet backup has been downloaded successfully.',
+    'settings.backupSubtitle': 'Keep your recovery phrase and wallet file safe.',
+    'settings.verifyFailed': 'Verification failed. Please try again.',
+
+    'settings.security.title': 'Security Settings',
+    'settings.security.subtitle': 'Manage your wallet security preferences.',
+    'settings.security.encrypted': 'Wallet Encrypted',
+    'settings.security.encryptedDesc': 'Your wallet is protected with a password.',
+    'settings.security.recoverySecured': 'Recovery Phrase Secured',
+    'settings.security.recoverySecuredDesc': 'Your 12-word recovery phrase is available for backup.',
+
+    'settings.help.title': 'Help & Support',
+    'settings.help.subtitle': 'Get help with your SCASH wallet.',
+
+    // ====== 钱包创建 / 恢复 (setup) ======
+    'setup.error.notEncrypted': 'Wallet was not encrypted properly.',
+    'setup.success.created': 'Wallet Created Successfully',
+    'setup.success.createdDesc': 'Your wallet file has been downloaded. Keep it safe!',
+    'setup.error.invalidWalletFile': 'Invalid Wallet File',
+    'setup.error.invalidWalletFileDesc': 'The selected file is not a valid wallet file.',
+    'setup.error.invalidPassword': 'Invalid Password',
+    'setup.error.invalidPasswordDesc': 'The password you entered is incorrect.',
+    'setup.copy.mnemonic': 'Copied to Clipboard',
+    'setup.copy.mnemonicDesc': 'Mnemonic phrase has been copied to clipboard.',
+    'setup.placeholder.enterWord': 'Enter word',
+
+    // ====== 收款页分享 ======
+    'receive.shareTitle': 'SCASH Wallet Address',
+    'receive.shareText': 'Send',
+
+    // ====== RPC 节点错误（节点返回的英文消息会被映射到这些 key） ======
+    'rpc.error.title': 'RPC error',
+    'rpc.error.unknown': 'Unknown error',
+    'rpc.error.mempoolConflict':
+      'Transaction conflicts with another in the mempool. Please refresh balance and try again.',
+    'rpc.error.alreadyKnown': 'Transaction already known by the node.',
+    'rpc.error.missingInputs':
+      'Inputs are missing or already spent. Please refresh balance and try again.',
+    'rpc.error.insufficientFee': 'Fee too low. Please increase fee and try again.',
+    'rpc.error.dust': 'Output amount too small (dust).',
+    'rpc.error.txTooLarge': 'Transaction is too large.',
+    'rpc.error.nonFinal': 'Transaction is non-final.',
+    'rpc.error.rbfRejected': 'Replacement transaction rejected.',
+    'rpc.error.immatureCoinbase': 'Coinbase output is not yet mature.',
+    'rpc.error.allNodesDown':
+      'All RPC nodes are unavailable. Please check your network or node configuration.',
+    'rpc.error.timeout': 'Request timeout. Please retry.',
+    'rpc.error.unauthorized': 'RPC authentication failed. Please check the username/password.',
+
+    // ====== 占位 / 通用 ======
+    'common.featureComingSoon': 'Feature coming soon',
+    'common.featureComingSoonDesc': 'This feature will be implemented soon.',
+    'assets.searchPlaceholder': 'Search transactions',
+
     'safety.instructions': `
     <section>
   <h2>Wallet Security and Signing Statement</h2>
@@ -747,6 +807,62 @@ const translations = {
     'wallet.invalidMnemonicWordCount': '需要 12 个单词，当前为 {n} 个',
     'wallet.invalidMnemonicChecksum': '单词拼写错误或顺序错误（BIP39 校验和未通过）。',
 
+    // ====== 重置 / 备份 / 安全 / 帮助 等设置页文案 ======
+    'settings.resetPreserveNote': '提示：您自定义的 RPC 节点、区块浏览器 URL 和语言偏好不会被清除。',
+    'settings.copyMnemonicSuccess': '已复制到剪贴板',
+    'settings.copyMnemonicDesc': '助记词已复制到剪贴板。',
+    'settings.backupDownloaded': '备份已下载',
+    'settings.backupDownloadedDesc': '钱包备份文件已成功下载。',
+    'settings.backupSubtitle': '请妥善保管您的助记词与钱包备份文件。',
+    'settings.verifyFailed': '验证失败，请重试。',
+
+    'settings.security.title': '安全设置',
+    'settings.security.subtitle': '管理您的钱包安全选项。',
+    'settings.security.encrypted': '钱包已加密',
+    'settings.security.encryptedDesc': '您的钱包已使用密码加密保护。',
+    'settings.security.recoverySecured': '助记词已可备份',
+    'settings.security.recoverySecuredDesc': '您的 12 词助记词已可用于备份。',
+
+    'settings.help.title': '帮助与支持',
+    'settings.help.subtitle': '获取关于 SCASH 钱包的帮助。',
+
+    // ====== 钱包创建 / 恢复 (setup) ======
+    'setup.error.notEncrypted': '钱包未正确加密。',
+    'setup.success.created': '钱包创建成功',
+    'setup.success.createdDesc': '钱包文件已下载，请妥善保管！',
+    'setup.error.invalidWalletFile': '钱包文件无效',
+    'setup.error.invalidWalletFileDesc': '所选文件不是有效的钱包文件。',
+    'setup.error.invalidPassword': '密码错误',
+    'setup.error.invalidPasswordDesc': '您输入的密码不正确。',
+    'setup.copy.mnemonic': '已复制到剪贴板',
+    'setup.copy.mnemonicDesc': '助记词已复制到剪贴板。',
+    'setup.placeholder.enterWord': '输入单词',
+
+    // ====== 收款页分享 ======
+    'receive.shareTitle': 'SCASH 钱包地址',
+    'receive.shareText': '请发送',
+
+    // ====== RPC 节点错误（节点返回的英文消息会被映射到这些 key） ======
+    'rpc.error.title': 'RPC 错误',
+    'rpc.error.unknown': '未知错误',
+    'rpc.error.mempoolConflict': '交易与内存池中另一笔交易冲突，请刷新余额后重试。',
+    'rpc.error.alreadyKnown': '节点已经收到过这笔交易。',
+    'rpc.error.missingInputs': '输入不存在或已被花掉，请刷新余额后重试。',
+    'rpc.error.insufficientFee': '手续费过低，请提高手续费后重试。',
+    'rpc.error.dust': '输出金额过小（粉尘）。',
+    'rpc.error.txTooLarge': '交易体积过大。',
+    'rpc.error.nonFinal': '交易尚未最终化。',
+    'rpc.error.rbfRejected': '替换交易被拒绝。',
+    'rpc.error.immatureCoinbase': '挖矿奖励尚未成熟，无法花费。',
+    'rpc.error.allNodesDown': '所有 RPC 节点不可用，请检查网络或节点配置。',
+    'rpc.error.timeout': '请求超时，请重试。',
+    'rpc.error.unauthorized': 'RPC 认证失败，请检查节点用户名/密码。',
+
+    // ====== 占位 / 通用 ======
+    'common.featureComingSoon': '功能即将推出',
+    'common.featureComingSoonDesc': '该功能即将上线，敬请期待。',
+    'assets.searchPlaceholder': '搜索交易',
+
     'safety.instructions': `
     <section>
   <h2 className="text-white font-medium mb-2">钱包安全与签名说明</h2>
@@ -1141,6 +1257,65 @@ const translations = {
     'wallet.invalidMnemonic': 'Неверная мнемоническая фраза',
     'wallet.invalidMnemonicWordCount': 'Нужно 12 слов, у вас введено {n}',
     'wallet.invalidMnemonicChecksum': 'Одно или несколько слов написаны неверно или расположены в неправильном порядке (BIP39 checksum failed).',
+
+    // ====== Сброс / Резервная копия / Безопасность / Помощь ======
+    'settings.resetPreserveNote':
+      'Примечание: ваши пользовательские RPC-узлы, URL эксплорера и выбор языка будут сохранены.',
+    'settings.copyMnemonicSuccess': 'Скопировано в буфер обмена',
+    'settings.copyMnemonicDesc': 'Мнемоническая фраза скопирована в буфер обмена.',
+    'settings.backupDownloaded': 'Резервная копия загружена',
+    'settings.backupDownloadedDesc': 'Резервная копия кошелька успешно загружена.',
+    'settings.backupSubtitle': 'Храните мнемоническую фразу и файл кошелька в безопасности.',
+    'settings.verifyFailed': 'Проверка не удалась. Попробуйте ещё раз.',
+
+    'settings.security.title': 'Настройки безопасности',
+    'settings.security.subtitle': 'Управляйте параметрами безопасности кошелька.',
+    'settings.security.encrypted': 'Кошелёк зашифрован',
+    'settings.security.encryptedDesc': 'Ваш кошелёк защищён паролем.',
+    'settings.security.recoverySecured': 'Мнемоника доступна для бэкапа',
+    'settings.security.recoverySecuredDesc': 'Ваши 12 слов мнемонической фразы доступны для резервного копирования.',
+
+    'settings.help.title': 'Помощь и поддержка',
+    'settings.help.subtitle': 'Получите помощь по работе с SCASH-кошельком.',
+
+    // ====== Создание / Восстановление кошелька ======
+    'setup.error.notEncrypted': 'Кошелёк не был корректно зашифрован.',
+    'setup.success.created': 'Кошелёк успешно создан',
+    'setup.success.createdDesc': 'Файл кошелька загружен. Храните его в безопасности!',
+    'setup.error.invalidWalletFile': 'Неверный файл кошелька',
+    'setup.error.invalidWalletFileDesc': 'Выбранный файл не является действительным файлом кошелька.',
+    'setup.error.invalidPassword': 'Неверный пароль',
+    'setup.error.invalidPasswordDesc': 'Введённый вами пароль неверен.',
+    'setup.copy.mnemonic': 'Скопировано в буфер обмена',
+    'setup.copy.mnemonicDesc': 'Мнемоническая фраза скопирована в буфер обмена.',
+    'setup.placeholder.enterWord': 'Введите слово',
+
+    // ====== Поделиться адресом получения ======
+    'receive.shareTitle': 'Адрес кошелька SCASH',
+    'receive.shareText': 'Отправьте',
+
+    // ====== Ошибки RPC ======
+    'rpc.error.title': 'Ошибка RPC',
+    'rpc.error.unknown': 'Неизвестная ошибка',
+    'rpc.error.mempoolConflict':
+      'Транзакция конфликтует с другой в mempool. Обновите баланс и попробуйте снова.',
+    'rpc.error.alreadyKnown': 'Узел уже знает об этой транзакции.',
+    'rpc.error.missingInputs':
+      'Входы отсутствуют или уже потрачены. Обновите баланс и попробуйте снова.',
+    'rpc.error.insufficientFee': 'Слишком низкая комиссия. Увеличьте комиссию и попробуйте снова.',
+    'rpc.error.dust': 'Сумма выхода слишком мала (dust).',
+    'rpc.error.txTooLarge': 'Транзакция слишком велика.',
+    'rpc.error.nonFinal': 'Транзакция не финальная.',
+    'rpc.error.rbfRejected': 'Заменяющая транзакция отклонена.',
+    'rpc.error.immatureCoinbase': 'Coinbase-выход ещё не созрел.',
+    'rpc.error.allNodesDown': 'Все RPC-узлы недоступны. Проверьте сеть или конфигурацию узла.',
+    'rpc.error.timeout': 'Превышено время ожидания. Повторите попытку.',
+    'rpc.error.unauthorized': 'Ошибка аутентификации RPC. Проверьте имя пользователя/пароль.',
+
+    // ====== Заполнители / общее ======
+    'common.featureComingSoon': 'Функция скоро появится',
+    'common.featureComingSoonDesc': 'Эта функция появится в одном из ближайших обновлений.',
+    'assets.searchPlaceholder': 'Поиск транзакций',
 
     'safety.instructions': `
     <section>
