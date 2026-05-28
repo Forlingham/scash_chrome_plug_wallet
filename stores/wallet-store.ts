@@ -213,14 +213,23 @@ export const useWalletStore = create<WalletState>()(
       },
 
       unlockWallet: (password: string) => {
+        // 多重防御保证错误密码绝对解锁不了：
+        //   1. 空密码直接拒
+        //   2. decryptWallet 内部已 try/catch，错误密码会返回 isSuccess: false
+        //   3. 这里再包一层 try/catch，万一 decryptWallet 因任何意外抛错，都视为失败
         if (!password) return false
-        const walletObj = decryptWallet(get().wallet.encryptedWallet, password)
-        if (!walletObj || !walletObj.isSuccess) return false
+        try {
+          const walletObj = decryptWallet(get().wallet.encryptedWallet, password)
+          if (!walletObj || !walletObj.isSuccess || !walletObj.wallet) return false
 
-        set((state) => {
-          state.isLocked = false
-        })
-        return true
+          set((state) => {
+            state.isLocked = false
+          })
+          return true
+        } catch (e) {
+          console.warn('解锁钱包异常：', e)
+          return false
+        }
       },
 
       clearWallet: () => {

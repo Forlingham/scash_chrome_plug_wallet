@@ -101,13 +101,56 @@ export function encryptWallet(wallet: WalletFile, passwordMD5String: string) {
 }
 
 export function decryptWallet(walletHex: string, password: string) {
-  const passwordMD5String = passwordMD5(password)
-  const walletString = hexToString(walletHex)
-  const wallet = decryptAES(walletString, 'walletFile', passwordMD5String)
-  if (!wallet) {
-    return { isSuccess: false, wallet: null }
+  // 防御层级：
+  //   1. 任何步骤抛错（hex 格式错、UTF-8 解码错、JSON.parse 错）都被 try/catch 兜住
+  //      返回 { isSuccess: false }。
+  //   2. JSON.parse 出来的对象必须包含钱包必需字段（mnemonic / address / path / privateKey），
+  //      否则也判为失败——避免错误密码偶尔解出貌似 UTF-8 的垃圾被当成"成功"。
+  //   3. 调用方（wallet-store unlockWallet 等）必须检查 isSuccess，而不是 truthy 检查
+  //      （decryptWallet 总是返回对象，永远 truthy）。
+  try {
+    const passwordMD5String = passwordMD5(password)
+    const walletString = hexToString(walletHex)
+    const decrypted = decryptAES(walletString, 'walletFile', passwordMD5String)
+    if (!decrypted) {
+      return { isSuccess: false, wallet: null as WalletFile | null }
+    }
+    const parsed = JSON.parse(decrypted) as WalletFile
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      typeof parsed.mnemonic !== 'string' ||
+      typeof parsed.address !== 'string' ||
+      typeof parsed.path !== 'string' ||
+      typeof parsed.privateKey !== 'string'
+    ) {
+      return { isSuccess: false, wallet: null as WalletFile | null }
+    }
+    return { isSuccess: true, wallet: parsed }
+  } catch (e) {
+    // 错误密码常见路径：AES 解出非 UTF-8 字节、或解出来的串不是合法 JSON
+    return { isSuccess: false, wallet: null as WalletFile | null }
   }
-  return { isSuccess: true, wallet: JSON.parse(wallet) as WalletFile }
+}
+
+/**
+ * 把用户输入的助记词规整成"BIP39 标准空格分隔"形式：
+ *   - 去掉首尾空白
+ *   - 把任意空白（含 \t \n \r、全角空格、零宽字符）压缩成单个英文空格
+ *   - 全部小写（BIP39 wordlist 是小写）
+ *
+ * 注意：本函数只做格式整理，不做 BIP39 词表 / 校验和校验。
+ * 调用方在拿到规整后的字符串后应使用 bip39.validateMnemonic() 进一步验证。
+ */
+export function normalizeMnemonic(input: string): string {
+  if (!input) return ''
+  return input
+    // 去掉零宽字符（移动端键盘有时会塞进来）
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    // 任意空白序列（包含全角空格 \u3000）→ 单个英文空格
+    .replace(/[\s\u3000]+/g, ' ')
+    .trim()
+    .toLowerCase()
 }
 
 export function downloadWalletFile(encryptedWallet: string, fileName = 'scash-wallet.json') {

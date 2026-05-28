@@ -339,6 +339,11 @@ const translations = {
     'wallet.price.period.7d': '7d',
     'wallet.price.period.30d': '30d',
 
+    // 助记词恢复校验
+    'wallet.invalidMnemonic': 'Invalid Mnemonic',
+    'wallet.invalidMnemonicWordCount': 'A 12-word phrase is required, you entered {n} words',
+    'wallet.invalidMnemonicChecksum': 'One or more words are misspelled, or the order is wrong (BIP39 checksum failed).',
+
     'safety.instructions': `
     <section>
   <h2>Wallet Security and Signing Statement</h2>
@@ -737,6 +742,11 @@ const translations = {
     'wallet.price.period.7d': '7天',
     'wallet.price.period.30d': '30天',
 
+    // 助记词恢复校验
+    'wallet.invalidMnemonic': '助记词无效',
+    'wallet.invalidMnemonicWordCount': '需要 12 个单词，当前为 {n} 个',
+    'wallet.invalidMnemonicChecksum': '单词拼写错误或顺序错误（BIP39 校验和未通过）。',
+
     'safety.instructions': `
     <section>
   <h2 className="text-white font-medium mb-2">钱包安全与签名说明</h2>
@@ -1126,6 +1136,11 @@ const translations = {
     'wallet.price.period.24h': '24ч',
     'wallet.price.period.7d': '7д',
     'wallet.price.period.30d': '30д',
+
+    // Восстановление по мнемонической фразе
+    'wallet.invalidMnemonic': 'Неверная мнемоническая фраза',
+    'wallet.invalidMnemonicWordCount': 'Нужно 12 слов, у вас введено {n}',
+    'wallet.invalidMnemonicChecksum': 'Одно или несколько слов написаны неверно или расположены в неправильном порядке (BIP39 checksum failed).',
 
     'safety.instructions': `
     <section>
