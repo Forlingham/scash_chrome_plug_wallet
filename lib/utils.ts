@@ -199,20 +199,43 @@ export function calcFee(inputCount: number, outputCount: number, feerate: number
 // =============================================================================
 // 地址校验
 // =============================================================================
+/**
+ * 验证 SCASH 地址是否有效
+ *
+ * 容错性：
+ *   - 自动 trim 首尾空白（粘贴地址时常带空格）
+ *   - 接受全大写形式（bech32 spec 明确允许 "all-lower 或 all-upper"，例如二维码
+ *     用大写更扫得准）。返回 true 即代表 normalizeScashAddress 之后能用于
+ *     bitcoinjs-lib 的 address.toOutputScript。
+ *   - 拒绝大小写混用（bech32 spec 明确禁止，且容易是被改过的字符）
+ */
 export function validateScashAddress(address: string) {
   try {
-    const decoded = bech32.decode(address)
-    if (decoded.prefix !== SCASH_NETWORK.bech32) return false
+    const trimmed = (address || '').trim()
+    if (!trimmed) return false
+    const decoded = bech32.decode(trimmed)
+    // bech32 库返回的 prefix 保持原大小写。这里用 toLowerCase 比较，让全大写也能过。
+    if (decoded.prefix.toLowerCase() !== SCASH_NETWORK.bech32) return false
 
-    const reencoded = bech32.encode(decoded.prefix, decoded.words)
-    if (reencoded !== address.toLowerCase()) return false
+    // 校验和验证：再编码回去看是否一致（bech32.encode 总输出小写）
+    const reencoded = bech32.encode(decoded.prefix.toLowerCase(), decoded.words)
+    if (reencoded !== trimmed.toLowerCase()) return false
 
+    // SegWit 程序长度（去掉 1 字节 version 后）必须在 [2, 40] 区间
     const data = bech32.fromWords(decoded.words.slice(1))
     if (data.length < 2 || data.length > 40) return false
     return true
   } catch (e) {
     return false
   }
+}
+
+/**
+ * 把用户输入的 SCASH 地址规整成 bitcoinjs-lib 能直接用的形式：去空白 + 全部小写。
+ * 调用方应当在用 address 构建交易输出之前过一次此函数。
+ */
+export function normalizeScashAddress(address: string): string {
+  return (address || '').trim().toLowerCase()
 }
 
 // =============================================================================

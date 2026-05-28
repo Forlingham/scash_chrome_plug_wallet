@@ -34,6 +34,7 @@ import {
   getWalletPrivateKey,
   hideString,
   NAME_TOKEN,
+  normalizeScashAddress,
   onOpenExplorer,
   signTransaction,
   sleep,
@@ -274,41 +275,67 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
   const handleAddAddress = () => setSendList([...sendList, { address: '', amount: '' }])
 
   const handleSendToConfirm = () => {
-    const validSendList = JSON.parse(
+    // 1. 先把所有 sendList 的 address 做归一化（trim + lowercase），再过滤
+    //    出地址合法 + 金额 > 0 的条目。这一步不会改原 sendList，只产生一个深拷贝。
+    const validSendList: SendList[] = JSON.parse(
       JSON.stringify(
-        sendList.filter((item) => {
-          return item.address && validateScashAddress(item.address) && item.amount && Number.parseFloat(item.amount) > 0
-        })
+        sendList
+          .map((item) => ({ ...item, address: normalizeScashAddress(item.address) }))
+          .filter((item) => {
+            return (
+              item.address &&
+              validateScashAddress(item.address) &&
+              item.amount &&
+              Number.parseFloat(item.amount) > 0
+            )
+          })
       )
     )
+
+    // 2. 没有合法收款人 —— 在 form 步骤就报错并返回，不切到 confirm。
     if (validSendList.length === 0) {
       setSendListConfirm([])
+      setTotalAmountError(t('send.invalidAddress'))
       return
     }
-    setStep('confirm')
 
+    // 3. 计算费用 / 是否需要从金额扣除手续费。注意：所有可能 return 的分支
+    //    都必须在 setStep('confirm') 之前完成；否则会出现"切到了 confirm 但
+    //    sendListConfirm 还是上一次值（或空）"的严重 bug——会导致广播出去的
+    //    交易里没有收款人输出，资金全成矿工费。
     let feeWithDap = networkFee
     if (dapInfo) feeWithDap = new Decimal(feeWithDap).plus(dapInfo.dapAmount).toNumber()
 
-    if (!deductFeeFromAmount) {
-      setSendAmountTotal(+new Decimal(sendAmount).add(feeWithDap).toFixed(8))
-    } else {
+    let amountTotal: number
+    if (deductFeeFromAmount) {
+      // 在最后一个金额够大的收款人 amount 里扣除整笔费用
       let lastIndex = validSendList.length - 1
       while (lastIndex >= 0) {
         if (new Decimal(validSendList[lastIndex].amount || '0').gte(feeWithDap)) {
-          validSendList[lastIndex].amount = new Decimal(validSendList[lastIndex].amount || '0').minus(feeWithDap).toString()
+          validSendList[lastIndex].amount = new Decimal(validSendList[lastIndex].amount || '0')
+            .minus(feeWithDap)
+            .toString()
           break
         }
         lastIndex--
       }
       if (lastIndex < 0) {
+        // 没有任何收款人金额能 cover 手续费 —— 留在 form 步骤展示错误
         setTotalAmountError(t('send.inputExceed'))
         return
       }
-      setSendAmountTotal(sendAmount)
+      amountTotal = sendAmount
+    } else {
+      amountTotal = +new Decimal(sendAmount).add(feeWithDap).toFixed(8)
     }
 
+    // 4. 全部校验都通过了，才一次性把 confirm step 需要的状态都写进去。
+    //    React 18 会把这几次 setState 合并成一次 render，进入 confirm 步骤时
+    //    sendListConfirm 一定是非空的。
+    setTotalAmountError('')
+    setSendAmountTotal(amountTotal)
     setSendListConfirm(validSendList)
+    setStep('confirm')
   }
 
   const handleScanQR = (index: number) => {
@@ -377,6 +404,22 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
 
     let outputs = [...sendListConfirm]
     if (dapInfo) outputs = [...outputs, ...dapInfo.outputs]
+
+    // 防御层：理论上 handleSendToConfirm 已经把所有不合法路径拦在 form 步骤了，
+    // 但万一 sendListConfirm 状态被异常清空，这里再兜一道——绝不能让一笔
+    // 没有任何收款人输出的交易广播出去（那样钱会全成矿工费）。
+    if (outputs.length === 0) {
+      toast({
+        title: t('send.error'),
+        description: t('send.errorInfo'),
+        variant: 'destructive'
+      })
+      setShowConfirmDialog(false)
+      setIsConfirmLoading(false)
+      setStep('form')
+      return
+    }
+
     const feeRate = new Decimal(networkFee).add(dapNetworkFee).toNumber()
     const signTransactionResult = signTransaction(pickUnspents, outputs, feeRate, wallet.address, child, appFee)
     if (!signTransactionResult.isSuccess) {
