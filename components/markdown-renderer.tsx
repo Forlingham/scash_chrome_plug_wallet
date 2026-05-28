@@ -7,7 +7,7 @@
 //   - 链接点击需用户二次确认（防钓鱼）
 //   - 图片附 referrerPolicy="no-referrer"（防隐私泄露）
 //
-// 配色：紫色高亮 / 链接 → emerald 主色；gray-* → zinc-*。
+// 配色：链接 / 行内代码 / 强调 / 引用线 → 品牌色 purple；表格、HR 等结构色 → zinc。
 
 import dynamic from 'next/dynamic'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -115,8 +115,8 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
             td: ({ node, ...props }) => <td {...props} className="px-2.5 py-2" />,
             hr: ({ node, ...props }) => <hr {...props} className="my-3 border-zinc-800" />,
             strong: ({ node, ...props }) => (
-              // 强调用 emerald-300，与全局主色一致
-              <strong {...props} className="font-semibold text-emerald-300" />
+              // 强调用 purple-300，与品牌色一致
+              <strong {...props} className="font-semibold text-purple-300" />
             ),
             em: ({ node, ...props }) => <em {...props} className="italic text-zinc-400" />,
             del: ({ node, ...props }) => <del {...props} className="line-through text-zinc-500" />,
@@ -135,14 +135,14 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
             blockquote: ({ node, ...props }) => (
               <blockquote
                 {...props}
-                className="border-l-2 border-emerald-500/50 pl-3 py-1 italic bg-zinc-900/40 rounded-r my-2 text-zinc-400"
+                className="border-l-2 border-purple-500/50 pl-3 py-1 italic bg-zinc-900/40 rounded-r my-2 text-zinc-400"
               />
             ),
             a: ({ node, href, ...props }) => (
               <a
                 {...props}
                 href={href}
-                className="text-emerald-400 hover:text-emerald-300 hover:underline break-all cursor-pointer transition-colors"
+                className="text-purple-400 hover:text-purple-300 hover:underline break-all cursor-pointer transition-colors"
                 onClick={(e) => {
                   e.preventDefault()
                   if (href) handleLinkClick(href)
@@ -154,7 +154,7 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
               if (isInline) {
                 return (
                   <code
-                    className="bg-zinc-800/80 text-emerald-300 rounded px-1.5 py-0.5 font-mono text-[11px] border border-zinc-700/40"
+                    className="bg-zinc-800/80 text-purple-300 rounded px-1.5 py-0.5 font-mono text-[11px] border border-zinc-700/40"
                     {...props}
                   >
                     {children}
@@ -199,7 +199,7 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
             <AlertDialogTitle className="text-sm">{t('common.externalLink')}</AlertDialogTitle>
             <AlertDialogDescription className="text-[11px] leading-relaxed">
               {t('common.externalLinkInfo')}
-              <span className="block mt-2 p-2 bg-zinc-950 rounded-md border border-zinc-800/60 break-all text-emerald-400 font-mono text-[10px] max-h-20 overflow-y-auto">
+              <span className="block mt-2 p-2 bg-zinc-950 rounded-md border border-zinc-800/60 break-all text-purple-400 font-mono text-[10px] max-h-20 overflow-y-auto">
                 {targetUrl}
               </span>
             </AlertDialogDescription>
@@ -208,7 +208,7 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
             <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirm}
-              className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+              className="bg-purple-600 text-white hover:bg-purple-500"
             >
               {t('common.continue')}
             </AlertDialogAction>

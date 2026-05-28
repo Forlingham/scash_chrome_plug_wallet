@@ -9,10 +9,15 @@ import { cn } from "@/lib/utils"
  * - 所有 variant 都走 design token（bg-primary / bg-secondary 等），
  *   颜色由 globals.css 的主题变量统一控制，便于切换主色或主题。
  * - 默认尺寸 sm/default 都收紧了 padding，更适合 360px 宽的 popup。
- * - 新增 success variant：用于"发送 / 确认"等高肯定性 CTA（emerald 实色）。
- * - 新增 subtle variant：用于次级操作，比 secondary 更轻、比 ghost 更显形。
+ *
+ * Variant 语义分工（与 logo 紫色匹配）：
+ *   - default → 品牌色 purple，主 CTA 用（发送、确认、解锁、保存等）
+ *   - success → emerald 实色，仅用于"成功状态"语义按钮（验证通过后的"返回首页"等）
+ *   - destructive → red，删除/重置等危险操作
+ *   - outline / subtle / ghost → 中性次级
+ *
  * - 新增 xs 尺寸（h-7）：用于工具栏图标按钮，避免 h-9 在 popup 里显得太"重"。
- * - focus-visible 走 ring 主色，键盘可用性通过桌面无障碍要求。
+ * - focus-visible 走 ring 主色（自动跟随 --ring，目前为 purple）。
  */
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background aria-invalid:ring-destructive/40 aria-invalid:border-destructive cursor-pointer",

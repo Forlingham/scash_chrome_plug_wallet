@@ -8,7 +8,7 @@
 //
 // 视觉重塑：
 //   - 远程 logo（vercel-storage）替换为本地 /logo.png，离线可用
-//   - 紫色按钮/聚焦色 → emerald 主色
+//   - 紫色按钮/聚焦色 → 品牌色 purple（与 SCASH logo 紫色相呼应）
 //   - 紧凑布局，输入框居中可读，配 Lock 图标暗示场景
 // ----------------------------------------------------------------------
 
@@ -105,7 +105,7 @@ export function WalletLockScreen({ onUnlock }: { onUnlock: (password: string) =>
             <Button
               onClick={handleUnlock}
               disabled={!password || busy}
-              variant="success"
+              variant="default"
               className="w-full h-10"
             >
               {busy ? (

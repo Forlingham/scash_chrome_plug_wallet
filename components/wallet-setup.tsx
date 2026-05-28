@@ -10,7 +10,7 @@
 //
 // 视觉/交互的桌面化改造：
 //   - logo 远程 URL（vercel-storage）替换为本地 /logo.png（manifest 已声明）
-//   - 紫色 purple-600 按钮 → emerald 主色（success variant）
+//   - 紫色按钮全部走 default variant（自动取品牌色 purple-600，与 logo 一致）
 //   - 字号收紧、间距压缩，单卡 max-w 改为 popup 宽度
 //   - 助记词 grid 紧凑化，3 列 12 词在 360 内可清晰阅读
 //   - 文件上传按钮样式从 file:bg-purple-600 改为主题色
@@ -464,7 +464,7 @@ function WelcomeStep({ onCreate, onRestore }: { onCreate: () => void; onRestore:
       </div>
 
       <div className="space-y-2 pt-2">
-        <Button onClick={onCreate} variant="success" className="w-full h-10 gap-2">
+        <Button onClick={onCreate} variant="default" className="w-full h-10 gap-2">
           <Plus className="h-4 w-4" />
           {t('wallet.createNew')}
         </Button>
@@ -529,7 +529,7 @@ function CreateMnemonicStep({
 
         {!showMnemonic && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <Button onClick={onReveal} variant="success" size="sm">
+            <Button onClick={onReveal} variant="default" size="sm">
               <Eye className="h-3.5 w-3.5" />
               {t('wallet.clickReveal')}
             </Button>
@@ -543,7 +543,7 @@ function CreateMnemonicStep({
             <Copy className="h-3.5 w-3.5" />
             {t('common.copy')}
           </Button>
-          <Button onClick={onContinue} variant="success" size="sm" className="flex-1">
+          <Button onClick={onContinue} variant="default" size="sm" className="flex-1">
             {t('wallet.savedIt')}
           </Button>
         </div>
@@ -606,7 +606,7 @@ function VerifyMnemonicStep({
         </Button>
         <Button
           onClick={onSubmit}
-          variant="success"
+          variant="default"
           size="sm"
           className="flex-1"
           disabled={userVerification.some((word) => !word.trim())}
@@ -690,7 +690,7 @@ function SetPasswordStep({
         </Button>
         <Button
           onClick={onSubmit}
-          variant="success"
+          variant="default"
           size="sm"
           className="flex-1"
           disabled={!password || !confirmPassword}
@@ -710,8 +710,8 @@ function DownloadWalletStep({ onDownload }: { onDownload: () => void }) {
   return (
     <div className="space-y-4 text-center pt-4">
       <div className="flex flex-col items-center gap-2">
-        <div className="w-14 h-14 rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/40 flex items-center justify-center">
-          <Download className="h-7 w-7 text-emerald-400" />
+        <div className="w-14 h-14 rounded-full bg-purple-500/15 ring-1 ring-purple-500/40 flex items-center justify-center">
+          <Download className="h-7 w-7 text-purple-400" />
         </div>
         <h3 className="text-base font-semibold text-zinc-100">{t('wallet.downloadWallet')}</h3>
         <p className="text-[11px] text-zinc-400 leading-relaxed px-2">
@@ -719,7 +719,7 @@ function DownloadWalletStep({ onDownload }: { onDownload: () => void }) {
         </p>
       </div>
 
-      <Button onClick={onDownload} variant="success" className="w-full h-10 gap-2">
+      <Button onClick={onDownload} variant="default" className="w-full h-10 gap-2">
         <Download className="h-4 w-4" />
         {t('wallet.downloadButton')}
       </Button>
@@ -750,7 +750,7 @@ function RestoreMethodStep({
       </div>
 
       <div className="space-y-2 pt-1">
-        <Button onClick={onUseRecovery} variant="success" className="w-full h-10 gap-2">
+        <Button onClick={onUseRecovery} variant="default" className="w-full h-10 gap-2">
           {t('wallet.useRecovery')}
         </Button>
         <Button onClick={onUploadFile} variant="outline" className="w-full h-10 gap-2">
@@ -806,7 +806,7 @@ function RestoreMnemonicStep({
         </Button>
         <Button
           onClick={onSubmit}
-          variant="success"
+          variant="default"
           size="sm"
           className="flex-1"
           disabled={!mnemonic.trim()}
@@ -847,7 +847,7 @@ function RestoreFileStep({
             type="file"
             accept=".json"
             onChange={onUpload}
-            className="text-xs file:mr-2 file:px-2 file:py-0.5 file:rounded file:border-0 file:bg-emerald-500/15 file:text-emerald-300 file:text-[11px] file:font-medium hover:file:bg-emerald-500/25 cursor-pointer"
+            className="text-xs file:mr-2 file:px-2 file:py-0.5 file:rounded file:border-0 file:bg-purple-500/15 file:text-purple-300 file:text-[11px] file:font-medium hover:file:bg-purple-500/25 cursor-pointer"
           />
         </CardContent>
       </Card>
@@ -865,7 +865,7 @@ function RestoreFileStep({
         </Button>
         <Button
           onClick={onSubmit}
-          variant="success"
+          variant="default"
           size="sm"
           className="flex-1"
           disabled={!walletFile}
@@ -936,7 +936,7 @@ function RestorePasswordStep({
         </Button>
         <Button
           onClick={onSubmit}
-          variant="success"
+          variant="default"
           size="sm"
           className="flex-1"
           disabled={!password}

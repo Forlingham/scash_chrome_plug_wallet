@@ -135,15 +135,15 @@ export function WalletAssets({ onNavigate }: WalletAssetsProps) {
       <Card>
         <CardContent>
           <div className="h-32 bg-zinc-950 rounded-md flex items-end justify-between p-3 relative overflow-hidden border border-zinc-800/60">
-            <div className="text-emerald-400 text-[10px] absolute top-2 left-2 tabular-nums">$0.0163</div>
-            <div className="text-emerald-400 text-[10px] absolute bottom-2 right-2 tabular-nums">$0.0130</div>
+            <div className="text-purple-400 text-[10px] absolute top-2 left-2 tabular-nums">$0.0163</div>
+            <div className="text-purple-400 text-[10px] absolute bottom-2 right-2 tabular-nums">$0.0130</div>
             <div className="text-zinc-500 text-[10px] absolute bottom-2 left-2">25-07-26</div>
             <div className="text-zinc-500 text-[10px] absolute bottom-2 right-16">25-08-25</div>
 
             <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 180" preserveAspectRatio="none">
               <path
                 d="M20,120 Q60,100 100,110 T180,90 T260,105 T340,85 T400,95"
-                stroke="#10b981"
+                stroke="#9333ea"
                 strokeWidth="2"
                 fill="none"
               />
@@ -154,8 +154,8 @@ export function WalletAssets({ onNavigate }: WalletAssetsProps) {
               />
               <defs>
                 <linearGradient id="assetGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-                  <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#9333ea" stopOpacity="0.4" />
+                  <stop offset="100%" stopColor="#9333ea" stopOpacity="0" />
                 </linearGradient>
               </defs>
             </svg>
@@ -204,7 +204,7 @@ export function WalletAssets({ onNavigate }: WalletAssetsProps) {
           <button
             key={tx.id}
             onClick={() => setSelectedTransaction(tx)}
-            className="w-full text-left rounded-lg border border-border bg-card hover:bg-zinc-800 transition-colors px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="w-full text-left rounded-lg border border-border bg-card hover:bg-zinc-800 transition-colors px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">

@@ -47,7 +47,7 @@ export function TransactionDetails({ transaction, onNavigate }: TransactionDetai
                 <User className="h-4 w-4 text-zinc-300" />
               </div>
               <div className="min-w-0">
-                <Label className="text-emerald-400 text-[10px] uppercase tracking-wider">
+                <Label className="text-purple-400 text-[10px] uppercase tracking-wider">
                   {t('transaction.sender')}
                 </Label>
                 <p className="text-xs text-zinc-100 font-medium truncate">
@@ -108,7 +108,7 @@ export function TransactionDetails({ transaction, onNavigate }: TransactionDetai
       <Card>
         <CardContent className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label className="text-emerald-400 text-[10px] uppercase tracking-wider">
+            <Label className="text-purple-400 text-[10px] uppercase tracking-wider">
               {t('transaction.note') || '备注'}
             </Label>
             <Button variant="ghost" size="icon-sm" aria-label="Edit">
@@ -174,7 +174,7 @@ function Field({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-center gap-1 shrink-0">
-        <Label className="text-emerald-400 text-[10px] uppercase tracking-wider">{label}</Label>
+        <Label className="text-purple-400 text-[10px] uppercase tracking-wider">{label}</Label>
         {editable && (
           <Button variant="ghost" size="icon-sm" className="h-4 w-4" aria-label="Edit">
             <Edit3 className="h-2.5 w-2.5" />

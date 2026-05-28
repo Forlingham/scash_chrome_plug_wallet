@@ -9,9 +9,9 @@
 //
 // 视觉/交互的桌面化改造：
 //   - 删除手机风格的紫粉渐变 / 大图标 / 大字号
-//   - 主 CTA "确认发送 / 立即支付" 改为 emerald 实色 success 按钮
-//   - 标签色由绿改 emerald-400，与主色统一
-//   - 成功页去掉紫色渐变奖章，换为 emerald 圆环 + 简洁信息卡
+//   - 主 CTA "确认发送 / 立即支付" 改为品牌色 purple（default 变体）
+//   - 表单 label 颜色统一为 purple-400（品牌点缀）
+//   - 成功页 hero 用 emerald CheckCircle2（功能性正向语义）+ 简洁信息卡
 // ----------------------------------------------------------------------
 
 import { QRScannerComponent } from '@/components/qr-scanner'
@@ -540,7 +540,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                   </p>
                   <button
                     onClick={() => onOpenExplorer('1', 'tx', currentPendingTransaction.id)}
-                    className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] text-purple-400 hover:text-purple-300 transition-colors"
                   >
                     <ExternalLink className="h-3 w-3" />
                     {t('transactions.openExplorer')}
@@ -599,7 +599,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
             </>
           )}
 
-          <Button onClick={() => onNavigate('home')} variant="success" className="w-full">
+          <Button onClick={() => onNavigate('home')} variant="default" className="w-full">
             {t('send.backToHome')}
           </Button>
         </div>
@@ -688,7 +688,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
         <Card>
           <CardContent className="space-y-2">
             <Label className="text-zinc-300 text-xs flex items-center gap-1.5">
-              <Lock className="h-3 w-3 text-emerald-400" />
+              <Lock className="h-3 w-3 text-purple-400" />
               {t('send.confirmTransaction')}
             </Label>
             <Input
@@ -715,7 +715,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
             <Button
               onClick={handlePasswordSubmit}
               disabled={isSliding || !password}
-              variant="success"
+              variant="default"
               className="w-full h-10"
             >
               {isSliding ? <Spinner /> : t('send.confirmPay')}
@@ -735,7 +735,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               <AlertDialogCancel onClick={handleCancelTransaction}>
                 {isCancelLoading ? <Spinner /> : t('send.cancel')}
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmTransaction} className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400">
+              <AlertDialogAction onClick={handleConfirmTransaction} className="bg-purple-600 text-white hover:bg-purple-500">
                 {isConfirmLoading ? <Spinner /> : t('send.confirmTransactionOn')}
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -770,7 +770,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       {sendList.map((item, index) => (
         <Card key={index}>
           <CardContent className="space-y-2.5">
-            <Label className="text-emerald-400 text-xs">{t('send.to')}</Label>
+            <Label className="text-purple-400 text-xs">{t('send.to')}</Label>
 
             <div className="relative">
               <Input
@@ -793,7 +793,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               )}
               <button
                 onClick={() => handleScanQR(index)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-emerald-400 hover:text-emerald-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-purple-400 hover:text-purple-300"
                 aria-label="Scan QR"
               >
                 <QrCode className="h-3.5 w-3.5" />
@@ -804,7 +804,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               <p className="text-red-400 text-[11px]">{t('send.invalidAddress')}</p>
             )}
 
-            <Label className="text-emerald-400 text-xs">{t('common.amount')}</Label>
+            <Label className="text-purple-400 text-xs">{t('common.amount')}</Label>
 
             <div className="relative">
               <Input
@@ -823,7 +823,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                 <button
                   type="button"
                   onClick={() => handleMaxAmount(index)}
-                  className="px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 rounded uppercase tracking-wider"
+                  className="px-1.5 py-0.5 text-[10px] font-semibold text-purple-300 hover:text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 rounded uppercase tracking-wider"
                 >
                   Max
                 </button>
@@ -843,17 +843,17 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       {/* 添加另一位收款人 */}
       <button
         onClick={handleAddAddress}
-        className="w-full px-3 py-2 rounded-lg border border-dashed border-zinc-700 hover:border-emerald-500/60 hover:bg-zinc-900/40 transition-colors flex items-center justify-between text-xs"
+        className="w-full px-3 py-2 rounded-lg border border-dashed border-zinc-700 hover:border-purple-500/60 hover:bg-zinc-900/40 transition-colors flex items-center justify-between text-xs"
       >
-        <span className="text-emerald-400">{t('send.addAnother')}</span>
-        <ChevronRight className="h-3.5 w-3.5 text-emerald-400" />
+        <span className="text-purple-400">{t('send.addAnother')}</span>
+        <ChevronRight className="h-3.5 w-3.5 text-purple-400" />
       </button>
 
       {/* 网络费 */}
       <Card>
         <CardContent className="space-y-2.5">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-emerald-400">{t('send.fee')}</span>
+            <span className="text-purple-400">{t('send.fee')}</span>
             <span className="text-zinc-200 tabular-nums">
               {isLoading ? (
                 <span className="inline-flex items-center gap-1.5 text-zinc-500">
@@ -883,12 +883,12 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       {/* DAP 留言 */}
       <Card>
         <CardContent className="space-y-2">
-          <Label className="text-emerald-400 text-xs">{t('send.message') || 'Message'}</Label>
+          <Label className="text-purple-400 text-xs">{t('send.message') || 'Message'}</Label>
           <textarea
             value={dapMessage}
             onChange={(e) => setDapMessage(e.target.value)}
             placeholder={t('send.messagePlaceholder') || 'Enter your message (optional)'}
-            className="w-full bg-zinc-950 text-zinc-100 placeholder-zinc-500 border border-border rounded-md p-2 text-xs resize-none h-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+            className="w-full bg-zinc-950 text-zinc-100 placeholder-zinc-500 border border-border rounded-md p-2 text-xs resize-none h-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
           />
 
           {dapInfo && (
@@ -925,7 +925,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       <Button
         onClick={handleSendToConfirm}
         disabled={networkFee <= 0 || isLoading || !!totalAmountError}
-        variant="success"
+        variant="default"
         className="w-full h-10"
       >
         {isLoading ? <Spinner /> : t('send.confirm')}

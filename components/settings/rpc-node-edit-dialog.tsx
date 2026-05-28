@@ -8,7 +8,7 @@
 //      再 getblockchaininfo 验通
 //   3. 测试通过即可保存；保存时也会请求权限
 //
-// 视觉：替换 bg-gray-800/700 等硬编码为主题 token，按钮改 emerald/outline。
+// 视觉：替换 bg-gray-800/700 等硬编码为主题 token，按钮改 default(purple)/outline。
 // ----------------------------------------------------------------------
 
 import { useEffect, useState } from 'react'
@@ -241,7 +241,7 @@ export function RpcNodeEditDialog({ open, onOpenChange, node }: RpcNodeEditDialo
           <Button
             disabled={!canSubmit}
             onClick={handleSubmit}
-            variant="success"
+            variant="default"
             size="sm"
           >
             {t('common.save')}

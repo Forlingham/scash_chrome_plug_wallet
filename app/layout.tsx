@@ -62,11 +62,11 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         {/*
-          theme-color 改为 emerald-500 主色，匹配新视觉。
+          theme-color 与 SCASH logo 紫色一致（purple-600 #9333ea）。
           viewport 删除 maximum-scale + user-scalable=no（这是手机端禁缩放配置，
           桌面插件不需要，且违反无障碍原则）。
         */}
-        <meta name="theme-color" content="#10b981" />
+        <meta name="theme-color" content="#9333ea" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>{`
           html {

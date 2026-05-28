@@ -10,7 +10,7 @@
 // 视觉/交互重塑：
 //   - 外层容器从 min-h-screen 改为 h-full（适配 popup 600px 固定高度）
 //   - header 高度由 80px 缩到 48px，与 home 工具栏视觉对齐
-//   - 去除紫色渐变标题，改用 zinc-100 + emerald 强调点
+//   - 标题改用 zinc-100 + 必要时 purple 品牌点缀
 //   - "功能即将上线" 占位页改造为简洁的居中提示
 // ----------------------------------------------------------------------
 
@@ -85,8 +85,8 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
         return (
           <div className="h-full flex items-center justify-center px-4">
             <div className="text-center max-w-[260px]">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/30 flex items-center justify-center mx-auto mb-3">
-                <Sparkles className="h-5 w-5 text-emerald-400" />
+              <div className="w-12 h-12 rounded-full bg-purple-500/10 ring-1 ring-purple-500/30 flex items-center justify-center mx-auto mb-3">
+                <Sparkles className="h-5 w-5 text-purple-400" />
               </div>
               <h2 className="text-base font-semibold text-zinc-100 mb-1">
                 {t('common.featureComingSoon')}

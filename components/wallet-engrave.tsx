@@ -8,7 +8,8 @@
 //   - 进入页面只拉一次 baseFee；余额由 dashboard 22s 定时器维护
 //
 // 视觉/交互的桌面化改造：
-//   - 紫粉渐变 → emerald 单色（与全局主色统一），重要文本块用 indigo 暗示"链上信息"
+//   - 紫粉渐变 → emerald/purple 双语义（emerald 用于成功 hero，purple 用于品牌点缀）
+//      重要文本块用 indigo 暗示"链上信息"
 //   - 大圆形渐变图标移除（手机风格"启动屏"），替换为简洁标签头
 //   - 紧凑化字号与间距，适配 360x600
 // ----------------------------------------------------------------------
@@ -289,7 +290,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
                   </p>
                   <button
                     onClick={() => onOpenExplorer('1', 'tx', currentPendingTransaction.id)}
-                    className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                    className="inline-flex items-center gap-1 text-[11px] text-purple-400 hover:text-purple-300 transition-colors"
                   >
                     <ExternalLink className="h-3 w-3" />
                     {t('transactions.openExplorer')}
@@ -329,7 +330,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
             </>
           )}
 
-          <Button onClick={() => onNavigate('home')} variant="success" className="w-full">
+          <Button onClick={() => onNavigate('home')} variant="default" className="w-full">
             {t('send.backToHome')}
           </Button>
         </div>
@@ -397,7 +398,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
         <Card>
           <CardContent className="space-y-2">
             <Label className="text-zinc-300 text-xs flex items-center gap-1.5">
-              <Lock className="h-3 w-3 text-emerald-400" />
+              <Lock className="h-3 w-3 text-purple-400" />
               {t('send.confirmTransaction')}
             </Label>
             <input
@@ -408,7 +409,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
                 if (passwordError) setPasswordError('')
               }}
               placeholder={t('send.inputPassword')}
-              className="w-full bg-zinc-950 text-zinc-100 placeholder-zinc-500 border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+              className="w-full bg-zinc-950 text-zinc-100 placeholder-zinc-500 border border-border rounded-md px-3 py-2 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
             />
             {passwordError && <p className="text-red-400 text-[11px]">{passwordError}</p>}
           </CardContent>
@@ -422,7 +423,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
           }}
         >
           <AlertDialogTrigger asChild>
-            <Button onClick={handlePasswordSubmit} disabled={!password} variant="success" className="w-full h-10">
+            <Button onClick={handlePasswordSubmit} disabled={!password} variant="default" className="w-full h-10">
               {t('send.confirmPay')}
             </Button>
           </AlertDialogTrigger>
@@ -441,7 +442,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleConfirmTransaction}
-                className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+                className="bg-purple-600 text-white hover:bg-purple-500"
               >
                 {isConfirmLoading ? <Spinner /> : t('send.confirmTransactionOn')}
               </AlertDialogAction>
@@ -465,8 +466,8 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
         <CardContent className="space-y-3">
           {/* 头部说明 */}
           <div className="flex items-start gap-2.5">
-            <div className="w-8 h-8 rounded-md bg-emerald-500/10 ring-1 ring-emerald-500/30 flex items-center justify-center shrink-0">
-              <MessageSquare className="h-4 w-4 text-emerald-400" />
+            <div className="w-8 h-8 rounded-md bg-purple-500/10 ring-1 ring-purple-500/30 flex items-center justify-center shrink-0">
+              <MessageSquare className="h-4 w-4 text-purple-400" />
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-medium text-zinc-100 leading-tight">
@@ -481,7 +482,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
           {/* 输入区 */}
           <div className="space-y-1.5 pt-1">
             <div className="flex items-center justify-between">
-              <Label className="text-emerald-400 text-xs">{t('send.engraveText')}</Label>
+              <Label className="text-purple-400 text-xs">{t('send.engraveText')}</Label>
               {engraveText && (
                 <DapMessageDisplay
                   content={engraveText}
@@ -493,7 +494,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
                     </>
                   }
                   title={t('dap.preview')}
-                  className="h-6 px-2 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                  className="h-6 px-2 text-[10px] text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
                 />
               )}
             </div>
@@ -501,7 +502,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
               value={engraveText}
               onChange={(e) => setEngraveText(e.target.value)}
               placeholder={t('send.engravePlaceholder')}
-              className="w-full bg-zinc-950 text-zinc-100 placeholder-zinc-500 border border-border rounded-md p-2.5 text-xs resize-none h-28 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 leading-relaxed"
+              className="w-full bg-zinc-950 text-zinc-100 placeholder-zinc-500 border border-border rounded-md p-2.5 text-xs resize-none h-28 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 leading-relaxed"
             />
             <div className="text-right text-[10px] text-zinc-500">
               {engraveText.length} {t('send.engraveChunkCount').toLowerCase()}
@@ -542,7 +543,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
       <Button
         onClick={handleSendToConfirm}
         disabled={!engraveText || !engraveText.trim() || pickUnspents.length === 0 || isLoading}
-        variant="success"
+        variant="default"
         className="w-full h-10"
       >
         {isLoading ? <Spinner /> : t('send.engraveButton')}

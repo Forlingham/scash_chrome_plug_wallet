@@ -6,11 +6,15 @@
 /* ==========================================================================
    SCASH Chrome 钱包 设计系统
    --------------------------------------------------------------------------
-   配色策略：
+   配色策略（与 logo 紫色圆形相呼应）：
    - 背景：zinc 系深色（zinc-950 / zinc-900 / zinc-800），呈现金融工具的克制
-   - 主色：emerald 翡翠绿（暗合 SCASH "S-CASH" 现金/财富语义）
-   - 次要色：sky 蓝（用于"接收/链上信息"等中性提示）
-   - 警示色：amber 琥珀（锁仓/待确认）、red 红（错误/失败）
+   - 品牌色：purple-600（与 SCASH logo 紫色圆形匹配，用于主 CTA / 链接 / 强调）
+   - 功能色（按语义分配，避免混用）：
+     · 正向 / 收款 / 在线 / 上涨 → emerald
+     · 警示 / 锁仓 / 待确认 → amber
+     · 错误 / 支出 / 下跌 → red
+     · 链上信息 / DAP 留言 → indigo
+     · mempool / 中性提示 → sky
    - 字体节奏：base = 14px，整体比 Web 端密一档，符合插件场景
    ========================================================================== */
 
@@ -22,7 +26,7 @@
   --card-foreground: oklch(0.141 0.005 285);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285);
-  --primary: oklch(0.696 0.17 162); /* emerald-500 */
+  --primary: oklch(0.558 0.288 302.321); /* purple-600，匹配 SCASH logo 紫色 */
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.967 0.001 286);
   --secondary-foreground: oklch(0.21 0.006 286);
@@ -34,7 +38,7 @@
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.92 0.004 286);
   --input: oklch(0.92 0.004 286);
-  --ring: oklch(0.696 0.17 162);
+  --ring: oklch(0.558 0.288 302.321);
   --radius: 0.5rem;
 }
 
@@ -49,9 +53,9 @@
   --popover: oklch(0.21 0.006 286);
   --popover-foreground: oklch(0.985 0 0);
 
-  /* === 主色：emerald 翡翠绿 === */
-  --primary: oklch(0.696 0.17 162); /* emerald-500 */
-  --primary-foreground: oklch(0.141 0.005 285);
+  /* === 品牌色：purple-600（与 SCASH logo 紫色相呼应） === */
+  --primary: oklch(0.558 0.288 302.321); /* purple-600 #9333ea */
+  --primary-foreground: oklch(0.985 0 0); /* white，purple 上对比度更佳 */
 
   /* === 次级面板（按钮 secondary 等） === */
   --secondary: oklch(0.274 0.006 286); /* zinc-800 */
@@ -72,24 +76,24 @@
   /* === 描边/输入框 === */
   --border: oklch(0.274 0.006 286 / 60%); /* zinc-800 半透 */
   --input: oklch(0.274 0.006 286);
-  --ring: oklch(0.696 0.17 162); /* emerald-500，键盘焦点环 */
+  --ring: oklch(0.558 0.288 302.321); /* purple-600，键盘焦点环 */
 
   /* === 图表色（保留多色，但偏中性） === */
-  --chart-1: oklch(0.696 0.17 162); /* emerald */
+  --chart-1: oklch(0.558 0.288 302.321); /* purple */
   --chart-2: oklch(0.685 0.169 237); /* sky */
-  --chart-3: oklch(0.769 0.188 70); /* amber */
-  --chart-4: oklch(0.637 0.237 25); /* red */
-  --chart-5: oklch(0.6 0.18 280); /* violet */
+  --chart-3: oklch(0.696 0.17 162); /* emerald */
+  --chart-4: oklch(0.769 0.188 70); /* amber */
+  --chart-5: oklch(0.637 0.237 25); /* red */
 
   /* === Sidebar（暂未使用，保留） === */
   --sidebar: oklch(0.21 0.006 286);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.696 0.17 162);
-  --sidebar-primary-foreground: oklch(0.141 0.005 285);
+  --sidebar-primary: oklch(0.558 0.288 302.321);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.274 0.006 286);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.274 0.006 286);
-  --sidebar-ring: oklch(0.696 0.17 162);
+  --sidebar-ring: oklch(0.558 0.288 302.321);
 }
 
 @theme inline {
@@ -165,8 +169,8 @@
      桌面键鼠交互
      ------------------------------------------------------------
      - 鼠标悬停时显式 cursor，所有可点击元素一致
-     - 键盘焦点环用 emerald 色，符合品牌
-     - 文本选择高亮也用 emerald
+     - 键盘焦点环用 purple 色，符合品牌
+     - 文本选择高亮也用 purple
      ============================================================ */
   [role='button'],
   button:not(:disabled),
@@ -176,7 +180,7 @@
   }
 
   ::selection {
-    background-color: oklch(0.696 0.17 162 / 35%);
+    background-color: oklch(0.558 0.288 302.321 / 35%);
     color: oklch(0.985 0 0);
   }
 
@@ -222,8 +226,9 @@
    ============================================================ */
 @layer utilities {
   /* 强调用渐变文字（仅用于 Logo / 品牌文字，不滥用） */
+  /* purple → fuchsia 渐变，与 logo 紫色基调统一 */
   .text-brand-gradient {
-    background: linear-gradient(135deg, oklch(0.765 0.177 163) 0%, oklch(0.685 0.169 237) 100%);
+    background: linear-gradient(135deg, oklch(0.714 0.203 305.504) 0%, oklch(0.667 0.295 322.15) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;

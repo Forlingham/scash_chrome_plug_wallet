@@ -7,7 +7,8 @@
 //   - 添加 / 编辑 / 删除 / 启停 / 切换 active
 //   - 显示当前 nodeInfo（连接状态 + 响应时间）
 //
-// 视觉：去掉手机风格大图标头与紫色标记，全面切到 emerald + zinc。
+// 视觉：去掉手机风格大图标头与紫色标记，全面切到 zinc + 品牌色 purple；
+//   "已激活节点" / "连接成功" 等正向状态保留 emerald 表语义。
 // ----------------------------------------------------------------------
 
 import { useState } from 'react'
@@ -85,8 +86,8 @@ export function RpcNodesSettings({ onBack }: RpcNodesSettingsProps) {
     <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
       {/* 紧凑标题区 */}
       <div className="flex items-start gap-2.5">
-        <div className="w-8 h-8 rounded-md bg-emerald-500/10 ring-1 ring-emerald-500/30 flex items-center justify-center shrink-0">
-          <Server className="h-4 w-4 text-emerald-400" />
+        <div className="w-8 h-8 rounded-md bg-purple-500/10 ring-1 ring-purple-500/30 flex items-center justify-center shrink-0">
+          <Server className="h-4 w-4 text-purple-400" />
         </div>
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-zinc-100 leading-tight">
@@ -226,7 +227,7 @@ export function RpcNodesSettings({ onBack }: RpcNodesSettingsProps) {
         })}
       </div>
 
-      <Button onClick={handleAdd} variant="success" size="sm" className="w-full">
+      <Button onClick={handleAdd} variant="default" size="sm" className="w-full">
         <Plus className="h-4 w-4" />
         {t('rpc.add')}
       </Button>
@@ -258,7 +259,7 @@ export function RpcNodesSettings({ onBack }: RpcNodesSettingsProps) {
             </AlertDialogTitle>
             <AlertDialogDescription className="text-[11px]">
               {t('rpc.deleteConfirmInfo')}
-              <span className="block mt-2 text-emerald-300 font-mono break-all">
+              <span className="block mt-2 text-purple-300 font-mono break-all">
                 {deletingNode?.url}
               </span>
             </AlertDialogDescription>

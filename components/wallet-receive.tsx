@@ -10,7 +10,7 @@
 //   - 删除 "FIO Request" 占位按钮（之前是 mock 设计）
 //   - 删除 navigator.share（桌面 Chrome 不支持，且 popup 弹分享面板体验差）
 //     如果用户确实想分享，桌面端的最佳方式就是复制地址
-//   - 二维码卡片去掉冗余包装，直接 emerald 框 + 白底
+// - 二维码卡片去掉冗余包装，直接 zinc 边框 + 白底（识别度优先）
 //   - 加金额预填输入框，使收据二维码可指定金额（保留原参数能力）
 // ----------------------------------------------------------------------
 
@@ -159,7 +159,7 @@ export function WalletReceive({ onNavigate }: WalletReceiveProps) {
           - FIO Request 是占位 mock，对桌面用户毫无价值
           - navigator.share() 在桌面 Chrome 不被广泛支持
           桌面端用户期望的就是"复制地址"——直接、明确、可靠。 */}
-      <Button onClick={copyAddress} variant="success" className="w-full h-10 gap-2">
+      <Button onClick={copyAddress} variant="default" className="w-full h-10 gap-2">
         {copied ? (
           <>
             <Check className="h-4 w-4" />

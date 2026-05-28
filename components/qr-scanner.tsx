@@ -8,8 +8,8 @@
 //   - 300ms 轮询解码当前 video frame
 //
 // 视觉重塑：
-//   - 紫色按钮 → emerald success 变体
-//   - 扫描框边框 green-400 → emerald-400
+//   - 紫色 purple-600 按钮 → default 变体（自动品牌色 purple）
+//   - 扫描框边框与扫描线 → purple-400（品牌识别色）
 //   - 弹层尺寸适配 popup（占满 inset，不再 max-w-md）
 //   - 紧凑化字号 / 间距
 // ----------------------------------------------------------------------
@@ -386,16 +386,16 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
               </div>
             )}
 
-            {/* 扫描框（emerald 角标 + 扫描线） */}
+            {/* 扫描框（purple 角标 + 扫描线，与 SCASH 品牌色一致） */}
             {isScanning && !isInitializing && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-40 h-40 relative">
-                  <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-emerald-400" />
-                  <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-emerald-400" />
-                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-emerald-400" />
-                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-emerald-400" />
+                  <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-purple-400" />
+                  <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-purple-400" />
+                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-purple-400" />
+                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-purple-400" />
                   <div className="absolute inset-0 overflow-hidden">
-                    <div className="w-full h-px bg-emerald-400 animate-pulse absolute top-1/2 -translate-y-1/2 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                    <div className="w-full h-px bg-purple-400 animate-pulse absolute top-1/2 -translate-y-1/2 shadow-[0_0_8px_rgba(147,51,234,0.6)]" />
                   </div>
                 </div>
               </div>
@@ -418,7 +418,7 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
             {isInitializing ? (
               <p className="text-[11px] text-amber-400">{t('qr.loading')}</p>
             ) : isScanning ? (
-              <p className="text-[11px] text-emerald-400">{t('qr.scanning')}</p>
+              <p className="text-[11px] text-purple-400">{t('qr.scanning')}</p>
             ) : hasCamera ? (
               <p className="text-[11px] text-zinc-400">{t('qr.cameraStopped')}</p>
             ) : (
@@ -433,7 +433,7 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
                 <Button
                   onClick={toggleScanning}
                   disabled={isInitializing}
-                  variant="success"
+                  variant="default"
                   size="sm"
                   className="flex-1"
                 >

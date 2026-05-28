@@ -10,7 +10,11 @@ import { cn } from "@/lib/utils"
 /**
  * Toast 通知样式（Chrome 插件桌面化重塑）
  * - 旧：紫粉渐变 + 紫色阴影（移动端 App 风格）
- * - 新：实色 zinc-900 + 主题色描边（emerald / red / amber），桌面工具风格
+ * - 新：实色 zinc-900 + 左侧 2px 主题色强调线（purple/emerald/red/amber）
+ *   purple = 默认 / 信息（与品牌色一致）
+ *   emerald = 成功
+ *   red = 错误
+ *   amber = 警告
  *
  * Viewport 已经针对 popup 适配：
  *   sm:right-4 + max-w-[320px]，确保 360px 窗口里 toast 不会贴边或被截断。
@@ -38,13 +42,13 @@ const toastVariants = cva(
   {
     variants: {
       variant: {
-        // 默认：中性灰 + 左侧 emerald 强调线
+        // 默认：中性灰 + 左侧 purple 品牌强调线
         default:
-          "border-zinc-800 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-emerald-500",
+          "border-zinc-800 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-purple-500",
         // 错误：红色描边 + 左侧红色强调线
         destructive:
           "border-red-500/30 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-red-500",
-        // 成功：emerald 描边
+        // 成功：emerald 描边（功能性正向）
         success:
           "border-emerald-500/30 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-emerald-500",
         // 警告：琥珀色
@@ -80,7 +84,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-zinc-700 bg-transparent px-2.5 text-xs font-medium transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
+      "inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-zinc-700 bg-transparent px-2.5 text-xs font-medium transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
       className
     )}
     {...props}

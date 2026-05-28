@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 /**
  * 自定义开关（兼容用，主推 ui/switch.tsx 的 Radix 版本）
- * 配色与全局主题一致：开 emerald-500 / 关 zinc-700。
+ * 配色与全局主题一致：开 purple-600（品牌色）/ 关 zinc-700。
  */
 interface CustomSwitchProps {
   checked: boolean
@@ -28,8 +28,8 @@ export function CustomSwitch({
       disabled={disabled}
       onClick={() => !disabled && onCheckedChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-8 min-h-5 max-h-5 min-w-8 max-w-8 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0',
-        checked ? 'bg-emerald-500' : 'bg-zinc-700',
+        'relative inline-flex h-5 w-8 min-h-5 max-h-5 min-w-8 max-w-8 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 flex-shrink-0',
+        checked ? 'bg-purple-600' : 'bg-zinc-700',
         className,
       )}
     >

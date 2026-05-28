@@ -11,8 +11,8 @@
 // 视觉/交互的桌面化改造：
 //   - 删除"滚动驱动 header 缩放动画"（手机沉浸式设计，桌面工具栏应稳定）
 //   - 删除滚动时弹出的余额条
-//   - 余额卡片：去渐变，单一 zinc-900 卡片 + emerald 强调
-//   - 4 个动作按钮：统一中性风格，唯一 Send 用 emerald 高亮（主 CTA 语义）
+//   - 余额卡片：去渐变，单一 zinc-900 卡片 + 中性配色
+//   - 4 个动作按钮：统一中性风格，唯一 Send 用品牌色 purple 高亮（主 CTA 语义）
 //   - 交易列表：信息密度更高，图标尺寸收紧到 28px
 //   - DAP 消息卡片：替换过重的 purple 为更内敛的 indigo
 // ----------------------------------------------------------------------
@@ -160,8 +160,8 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
   }
 
   // ===== 信号强度统一推导器（节点 / 浏览器都用） =====
-  // 从 ms 响应时间映射到 4 档信号；颜色用 emerald → amber → red 渐进，
-  // 而不是之前的红绿黄混搭，更符合金融工具的克制感。
+  // 从 ms 响应时间映射到 4 档信号；连接成功用 emerald（功能性正向语义），
+  // 慢/弱连接降级到 amber，断开为 red，与全局功能色规范一致。
   function buildSignal(
     status: 'connected' | 'disconnected' | 'checking',
     responseTime: number,
@@ -425,7 +425,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
         {/* ========== 4 个操作按钮 ==========
             视觉策略：
             - 不再 4 种渐变背景，统一 zinc-900 卡片 + zinc-800/60 边框
-            - 唯一 "Send" 用 emerald 强调（主 CTA 语义）
+            - 唯一 "Send" 用品牌色 purple 强调（主 CTA 语义）
             - hover 时整卡背景从 zinc-900 → zinc-800
             - 去掉 active:scale-95（手机点按反馈，桌面用 hover 反馈替代）
         */}
@@ -489,7 +489,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
             </div>
             <button
               onClick={() => onOpenExplorer('2', 'address', wallet.address)}
-              className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors shrink-0"
+              className="flex items-center gap-1 text-[10px] text-purple-400 hover:text-purple-300 transition-colors shrink-0"
             >
               {t('transactions.openExplorer')}
               <ExternalLink className="h-2.5 w-2.5" />
@@ -533,7 +533,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
                     </div>
                     <button
                       onClick={() => onOpenExplorer('1', 'tx', tx.id)}
-                      className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0"
+                      className="text-[10px] text-purple-400 hover:text-purple-300 shrink-0"
                     >
                       {t('transactions.particulars')}
                     </button>
@@ -634,7 +634,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
                     </div>
                     <button
                       onClick={() => onOpenExplorer('2', 'tx', tx.id)}
-                      className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0"
+                      className="text-[10px] text-purple-400 hover:text-purple-300 shrink-0"
                     >
                       {t('transactions.particulars')}
                     </button>
@@ -660,8 +660,8 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
 // ============================================================
 // 内部组件：动作按钮（首页四方格之一）
 // ------------------------------------------------------------
-// primary=true 时使用 emerald 主色调（仅 Send 按钮使用），
-// 其余按钮走中性 zinc，避免 4 色彩虹混搭。
+// primary=true 时使用品牌色 purple 调（仅 Send 按钮使用），
+// 其余按钮走中性 zinc，避免 4 色彩虹混搭；purple 与 logo 紫色相呼应。
 // ============================================================
 function ActionButton({
   icon,
@@ -677,16 +677,16 @@ function ActionButton({
   return (
     <button
       onClick={onClick}
-      className={`group flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+      className={`group flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
         primary
-          ? 'bg-emerald-500/10 border-emerald-500/40 hover:bg-emerald-500/15 hover:border-emerald-500/60'
+          ? 'bg-purple-500/10 border-purple-500/40 hover:bg-purple-500/15 hover:border-purple-500/60'
           : 'bg-zinc-900 border-zinc-800/80 hover:bg-zinc-800 hover:border-zinc-700'
       }`}
     >
       <span
         className={`flex items-center justify-center w-7 h-7 rounded-full transition-colors ${
           primary
-            ? 'bg-emerald-500/20 text-emerald-300 group-hover:bg-emerald-500/30'
+            ? 'bg-purple-500/20 text-purple-300 group-hover:bg-purple-500/30'
             : 'bg-zinc-800 text-zinc-300 group-hover:bg-zinc-700 group-hover:text-zinc-100'
         }`}
       >
@@ -694,7 +694,7 @@ function ActionButton({
       </span>
       <span
         className={`text-[10px] font-medium tracking-wide ${
-          primary ? 'text-emerald-300' : 'text-zinc-400 group-hover:text-zinc-200'
+          primary ? 'text-purple-300' : 'text-zinc-400 group-hover:text-zinc-200'
         }`}
       >
         {label}

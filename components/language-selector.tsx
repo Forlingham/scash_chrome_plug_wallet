@@ -16,7 +16,7 @@ const languageNames = {
  * 语言切换器（Chrome 插件桌面版）
  * - 触发器收紧为 icon-sm 尺寸 + 仅显示语言代码缩写，节省 header 横向空间
  * - 弹层使用 popover token 颜色（自动跟主题），不再硬编码 gray-800
- * - 当前选中项加 emerald 勾选标记
+ * - 当前选中项加 purple 勾选标记（与品牌色一致）
  */
 export function LanguageSelector() {
   const language = useLanguage()
@@ -55,12 +55,12 @@ export function LanguageSelector() {
                 onClick={() => handleLanguageSelect(code as Language)}
                 className={`w-full flex items-center justify-between px-2 py-1.5 text-xs rounded-sm transition-colors cursor-pointer ${
                   selected
-                    ? 'text-emerald-300 bg-emerald-500/10'
+                    ? 'text-purple-300 bg-purple-500/10'
                     : 'text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800'
                 }`}
               >
                 <span>{name}</span>
-                {selected && <Check className="h-3 w-3 text-emerald-400" />}
+                {selected && <Check className="h-3 w-3 text-purple-400" />}
               </button>
             )
           })}

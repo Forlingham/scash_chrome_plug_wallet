@@ -11,7 +11,7 @@
 //   - 重置（清空 localStorage 但保留 RPC / 浏览器 / 语言偏好）
 //
 // 视觉：去掉每页的"大紫色图标头"，改为统一的 32px 紧凑标题；
-//      所有按钮 / 卡片走 token，重要 CTA 用 emerald (success)；
+//      所有按钮 / 卡片走 token，重要 CTA 用品牌色 purple（default variant）；
 //      捐赠地址表格紧凑化，加复制反馈。
 // ----------------------------------------------------------------------
 
@@ -233,7 +233,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     return (
       <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
         <SubHeader
-          icon={<Key className="h-4 w-4 text-emerald-400" />}
+          icon={<Key className="h-4 w-4 text-purple-400" />}
           title={t('settings.changePassword')}
           description={t('settings.changePasswordInfo2')}
         />
@@ -295,7 +295,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           </Button>
           <Button
             onClick={handlePasswordChange}
-            variant="success"
+            variant="default"
             size="sm"
             className="flex-1"
             disabled={!passwords.current || !passwords.new || !passwords.confirm}
@@ -314,7 +314,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     return (
       <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
         <SubHeader
-          icon={<Download className="h-4 w-4 text-emerald-400" />}
+          icon={<Download className="h-4 w-4 text-purple-400" />}
           title={t('settings.backup')}
           description={t('settings.backupSubtitle')}
         />
@@ -345,7 +345,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
 
               {!showMnemonic && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Button onClick={handClickReveal} variant="success" size="sm">
+                  <Button onClick={handClickReveal} variant="default" size="sm">
                     <Eye className="h-3.5 w-3.5" />
                     {t('wallet.clickReveal')}
                   </Button>
@@ -365,7 +365,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         <Card>
           <CardContent className="space-y-2.5">
             <div className="flex items-center gap-1.5">
-              <Download className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
+              <Download className="h-3.5 w-3.5 text-purple-400 shrink-0" />
               <h3 className="text-xs text-zinc-100 font-medium">
                 {t('settings.backupConfirmTitle')}
               </h3>
@@ -373,7 +373,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
             <p className="text-[11px] text-zinc-400 leading-relaxed">
               {t('settings.backupConfirmInfo')}
             </p>
-            <Button onClick={downloadBackup} variant="success" size="sm" className="w-full">
+            <Button onClick={downloadBackup} variant="default" size="sm" className="w-full">
               <Download className="h-3.5 w-3.5" />
               {t('settings.backupConfirm')}
             </Button>
@@ -388,7 +388,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-1.5 text-sm">
-                <Lock className="h-4 w-4 text-emerald-400" />
+                <Lock className="h-4 w-4 text-purple-400" />
                 {t('settings.verifyPassword')}
               </AlertDialogTitle>
               <AlertDialogDescription className="text-[11px]">
@@ -425,7 +425,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handlePasswordVerify}
-                className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+                className="bg-purple-600 text-white hover:bg-purple-500"
               >
                 {t('common.verify')}
               </AlertDialogAction>
@@ -443,7 +443,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     return (
       <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
         <SubHeader
-          icon={<Shield className="h-4 w-4 text-emerald-400" />}
+          icon={<Shield className="h-4 w-4 text-purple-400" />}
           title={t('settings.security.title')}
           description={t('settings.security.subtitle')}
         />
@@ -512,7 +512,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     return (
       <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
         <SubHeader
-          icon={<HelpCircle className="h-4 w-4 text-emerald-400" />}
+          icon={<HelpCircle className="h-4 w-4 text-purple-400" />}
           title={t('settings.help.title')}
           description={t('settings.help.subtitle')}
         />
@@ -520,7 +520,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         <Card>
           <CardContent>
             <div
-              className="text-[11px] text-zinc-400 leading-relaxed prose prose-sm max-w-none prose-invert prose-p:my-1 prose-headings:text-zinc-200 prose-a:text-emerald-400"
+              className="text-[11px] text-zinc-400 leading-relaxed prose prose-sm max-w-none prose-invert prose-p:my-1 prose-headings:text-zinc-200 prose-a:text-purple-400"
               dangerouslySetInnerHTML={{ __html: t('safety.instructions') }}
             />
           </CardContent>
@@ -529,7 +529,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         <Card>
           <CardContent>
             <div
-              className="text-[11px] text-zinc-400 leading-relaxed prose prose-sm max-w-none prose-invert prose-p:my-1 prose-headings:text-zinc-200 prose-a:text-emerald-400"
+              className="text-[11px] text-zinc-400 leading-relaxed prose prose-sm max-w-none prose-invert prose-p:my-1 prose-headings:text-zinc-200 prose-a:text-purple-400"
               dangerouslySetInnerHTML={{ __html: t('Technical.Overview') }}
             />
           </CardContent>
@@ -620,19 +620,19 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           <button
             key={index}
             onClick={item.action}
-            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border bg-card text-left transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-              item.highlight ? 'border-emerald-500/40' : 'border-border'
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border bg-card text-left transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              item.highlight ? 'border-purple-500/40' : 'border-border'
             }`}
           >
             <div
               className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
                 item.highlight
-                  ? 'bg-emerald-500/15 ring-1 ring-emerald-500/30'
+                  ? 'bg-purple-500/15 ring-1 ring-purple-500/30'
                   : 'bg-zinc-800'
               }`}
             >
               <item.icon
-                className={`h-4 w-4 ${item.highlight ? 'text-emerald-400' : 'text-zinc-300'}`}
+                className={`h-4 w-4 ${item.highlight ? 'text-purple-400' : 'text-zinc-300'}`}
               />
             </div>
             <div className="flex-1 min-w-0">
@@ -762,7 +762,7 @@ function SubHeader({
 }) {
   return (
     <div className="flex items-start gap-2.5">
-      <div className="w-8 h-8 rounded-md bg-emerald-500/10 ring-1 ring-emerald-500/30 flex items-center justify-center shrink-0">
+      <div className="w-8 h-8 rounded-md bg-purple-500/10 ring-1 ring-purple-500/30 flex items-center justify-center shrink-0">
         {icon}
       </div>
       <div className="min-w-0">
