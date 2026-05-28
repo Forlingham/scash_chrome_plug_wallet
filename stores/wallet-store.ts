@@ -1,18 +1,26 @@
-import { BlockchainInfo, getBaseFeeApi, getBlockchainInfoApi, getScantxoutsetApi, Unspent } from '@/lib/api'
-import { decryptWallet } from '@/lib/utils'
+// =============================================================================
+// 钱包状态管理（zustand + persist + immer）
+//
+// 与 web 钱包 stores/wallet-store.ts 同源，主要差异：
+//   - 扩展端 coinPrice 不再来自 getblockchaininfo，独立通过 setUpdateCoinPrice 拉取。
+//   - 新增 nodeInfo 字段，由 RPC 调用回填，用于驱动 wallet-home 上的"当前节点 / 信号强度"UI。
+// =============================================================================
+
+import { BlockchainInfo, CoinPriceData, getBaseFeeApi, getBlockchainInfoApi, getCoinPriceApi, getScantxoutsetApi, Unspent } from '@/lib/api'
+import { decryptWallet, extractMyOutputsFromRawtx } from '@/lib/utils'
 import Decimal from 'decimal.js'
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 
-// 钱包信息接口
 interface WalletInfo {
   isHasWallet: boolean
   address: string
   balance: number
+  // 别人发给我但确认数不够的（已上链）金额
   lockBalance: number
-  // 内存池中锁定的余额
-  memPoolLockBalance: number
+  // 别人发给我但还没上链的金额（来自 Explorer）
+  memPoolBalance: number
   usableBalance: number
   encryptedWallet: string
 }
@@ -45,11 +53,13 @@ export interface PendingTransaction {
 // 钱包状态接口
 interface WalletState {
   blockchainInfo: BlockchainInfo
-  // 状态
+  // 当前最近一次调用 RPC 的节点信息（含连接状态、host、响应耗时）
+  nodeInfo: NodeInfo
+  // Explorer 接口最近一次响应耗时（用于 UI 信号强度）
+  explorerInfo: { endpoint: string; responseTime: number } | null
+
   wallet: WalletInfo
-  //可用的交易
   unspent: Unspent[]
-  // 交易记录
   transactions: Transaction[]
   pendingTransactions: PendingTransaction[]
   isInitialized: boolean
@@ -57,12 +67,11 @@ interface WalletState {
   error: string | null
   isLocked: boolean
   coinPrice: string
-  // 确认数
+  // 富币价信息（含 24h/7d/30d 涨跌幅 + 走势数据）。运行时拉取，不持久化。
+  coinPriceInfo: CoinPriceData
   confirmations: number
-  // 基础交易手续费
   baseFee: number
 
-  // Actions - 类似 Pinia 的 actions
   setWallet: (wallet: WalletInfo) => void
   updateBalance: (balance: number) => void
   addTransaction: (transaction: Transaction) => void
@@ -74,30 +83,25 @@ interface WalletState {
   clearWallet: () => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
-
-  // Getters - 类似 Pinia 的 getters
-  // getFormattedBalance: () => string
-  // getRecentTransactions: (limit?: number) => Transaction[]
-  // isWalletConnected: () => boolean
+  setExplorerInfo: (info: { endpoint: string; responseTime: number } | null) => void
 
   getBaseFee: (isRemote?: boolean) => Promise<{
     isSuccess: boolean
     status: 'local' | 'remote' | 'error'
     fee: number
   }>
-  // 定时跟新数据的一些方法
+
+  // 定时更新方法
   unSetUpdate: () => void
   setUpdateBlockchaininfo: () => Promise<void>
   setUpdateBalance: () => Promise<void>
-
   setUpdateBalanceByMemPool: () => void
+  setUpdateCoinPrice: () => Promise<void>
+  setMemPoolBalance: (memPool: number) => void
 }
 
-// 创建钱包状态存储 - 类似 Pinia 的 defineStore
 export const useWalletStore = create<WalletState>()(
-  // 持久化中间件 - 类似 Pinia 的 persist
   persist(
-    // Immer 中间件用于不可变状态更新
     immer((set, get) => ({
       blockchainInfo: {
         chain: '',
@@ -115,13 +119,14 @@ export const useWalletStore = create<WalletState>()(
         warnings: '',
         coinPrice: '0'
       },
-      // 初始状态
+      nodeInfo: { status: 'checking', endpoint: '', responseTime: 0 },
+      explorerInfo: null,
       wallet: {
         isHasWallet: false,
         address: '',
         balance: 0,
         lockBalance: 0,
-        memPoolLockBalance: 0,
+        memPoolBalance: 0,
         usableBalance: 0,
         encryptedWallet: ''
       },
@@ -133,10 +138,17 @@ export const useWalletStore = create<WalletState>()(
       error: null,
       isLocked: false,
       coinPrice: '0',
+      coinPriceInfo: {
+        price: 0,
+        change24h: 0,
+        changePercent24h: 0,
+        changePercent7d: 0,
+        changePercent30d: 0,
+        priceChart: []
+      },
       confirmations: 1,
       baseFee: 0,
 
-      // Actions
       setWallet: (wallet: WalletInfo) => {
         set((state) => {
           state.wallet = wallet
@@ -154,16 +166,12 @@ export const useWalletStore = create<WalletState>()(
 
       addTransaction: (transaction: Transaction) => {
         set((state) => {
-          // 检查是否已存在相同的交易
           const existingTransaction = state.transactions.find((tx) => tx.id === transaction.id)
           if (existingTransaction) {
-            // 如果已存在，更新状态而不是添加
             Object.assign(existingTransaction, transaction)
             return
           }
-
           state.transactions.unshift(transaction)
-          // 只保留最近 100 条交易记录
           if (state.transactions.length > 100) {
             state.transactions = state.transactions.slice(0, 100)
           }
@@ -172,10 +180,8 @@ export const useWalletStore = create<WalletState>()(
 
       addPendingTransaction: (transaction: PendingTransaction) => {
         set((state) => {
-          // 检查是否已存在相同的交易
           const existingTransaction = state.pendingTransactions.find((tx) => tx.id === transaction.id)
           if (existingTransaction) {
-            // 如果已存在，更新状态而不是添加
             Object.assign(existingTransaction, transaction)
             return
           }
@@ -193,7 +199,6 @@ export const useWalletStore = create<WalletState>()(
               state.unspent.push(item)
             }
           })
-          // state.unspent = unspent
         })
       },
       deleteUnspent: (txid: string) => {
@@ -209,20 +214,23 @@ export const useWalletStore = create<WalletState>()(
       },
 
       unlockWallet: (password: string) => {
-        // 这里应该实现密码验证逻辑
-        // 暂时简单返回 true
-        if (!password) {
-          return false
-        }
-        const walletObj = decryptWallet(get().wallet.encryptedWallet, password)
-        if (!walletObj) {
-          return false
-        }
+        // 多重防御保证错误密码绝对解锁不了：
+        //   1. 空密码直接拒
+        //   2. decryptWallet 内部已 try/catch，错误密码会返回 isSuccess: false
+        //   3. 这里再包一层 try/catch，万一 decryptWallet 因任何意外抛错，都视为失败
+        if (!password) return false
+        try {
+          const walletObj = decryptWallet(get().wallet.encryptedWallet, password)
+          if (!walletObj || !walletObj.isSuccess || !walletObj.wallet) return false
 
-        set((state) => {
-          state.isLocked = false
-        })
-        return true
+          set((state) => {
+            state.isLocked = false
+          })
+          return true
+        } catch (e) {
+          console.warn('解锁钱包异常：', e)
+          return false
+        }
       },
 
       clearWallet: () => {
@@ -232,12 +240,11 @@ export const useWalletStore = create<WalletState>()(
             address: '',
             balance: 0,
             lockBalance: 0,
-            memPoolLockBalance: 0,
+            memPoolBalance: 0,
             usableBalance: 0,
             encryptedWallet: ''
           }
           state.transactions = []
-
           state.error = null
         })
       },
@@ -254,32 +261,16 @@ export const useWalletStore = create<WalletState>()(
         })
       },
 
-      // Getters
-      getFormattedBalance: () => {
-        const wallet = get().wallet
-        if (!wallet) return '0.00000000'
-        return (wallet.balance / 100000000).toFixed(8) // 转换为 BTC 单位
+      setExplorerInfo: (info) => {
+        set((state) => {
+          state.explorerInfo = info
+        })
       },
 
-      getRecentTransactions: (limit = 10) => {
-        return get().transactions.slice(0, limit)
-      },
-
-      isWalletConnected: () => {
-        const wallet = get().wallet
-        const isLocked = get().isLocked
-        return wallet.address !== '' && !isLocked
-      },
-
-      // 获取基础交易手续费
       getBaseFee: async (isRemote = false) => {
         const localFee = get().baseFee
         if (localFee && !isRemote) {
-          return {
-            isSuccess: true,
-            status: 'local',
-            fee: localFee
-          }
+          return { isSuccess: true, status: 'local', fee: localFee }
         }
         try {
           const res = await getBaseFeeApi()
@@ -287,166 +278,310 @@ export const useWalletStore = create<WalletState>()(
             const fee = res.data.rpcData.feerate
             set((state) => {
               state.baseFee = fee
+              if (res.data.nodeInfo) {
+                state.nodeInfo = {
+                  status: 'connected',
+                  endpoint: res.data.nodeInfo.endpoint,
+                  responseTime: res.data.nodeInfo.responseTime
+                }
+              }
             })
-            return {
-              isSuccess: true,
-              status: 'remote',
-              fee: fee
-            }
+            return { isSuccess: true, status: 'remote', fee }
           }
-          return {
-            isSuccess: false,
-            status: 'error',
-            fee: 0
-          }
+          return { isSuccess: false, status: 'error', fee: 0 }
         } catch (error) {
           console.log('获取基础交易手续费 错误：', error)
-          return {
-            isSuccess: false,
-            status: 'error',
-            fee: 0
-          }
+          return { isSuccess: false, status: 'error', fee: 0 }
         }
       },
 
-      // 定时跟新数据的一些方法
+      // ===== 定时更新链 =====
+      // 注意：实际定时调度在组件层（wallet-dashboard）做，store 这里只暴露方法。
       unSetUpdate: () => {
         setTimeout(() => {
           get().setUpdateBlockchaininfo()
           get().setUpdateBalance()
+          get().setUpdateCoinPrice()
         }, 10 * 1000)
       },
 
-      // 获取当前节点状态
       setUpdateBlockchaininfo: async () => {
+        // 进入 checking 态，UI 立即显示"检测中"
+        set((state) => {
+          if (state.nodeInfo.status !== 'connected') {
+            state.nodeInfo = { ...state.nodeInfo, status: 'checking' }
+          }
+        })
         try {
           const res = await getBlockchainInfoApi()
           if (res.data.success) {
             set((state) => {
-              state.blockchainInfo = res.data.rpcData
-
-              state.coinPrice = res.data.rpcData.coinPrice
+              state.blockchainInfo = {
+                ...res.data.rpcData,
+                coinPrice: state.coinPrice
+              }
+              if (res.data.nodeInfo) {
+                state.nodeInfo = {
+                  status: 'connected',
+                  endpoint: res.data.nodeInfo.endpoint,
+                  responseTime: res.data.nodeInfo.responseTime
+                }
+              }
+            })
+          } else {
+            set((state) => {
+              state.nodeInfo = { status: 'disconnected', endpoint: '', responseTime: 0 }
             })
           }
         } catch (error) {
           console.log('获取当前节点状态 错误：', error)
+          set((state) => {
+            state.nodeInfo = { status: 'disconnected', endpoint: '', responseTime: 0 }
+          })
         }
       },
 
-      // 获取当前账号余额，和可用的交易
+      // ===== 余额计算（atomic & 自洽）=====
+      // 设计目标：每次 setUpdateBalance 算出来的 4 个余额字段必须满足
+      //   balance = usableBalance + lockBalance + memPoolBalance
+      // 分类规则：
+      //   1. 自己 pending tx 正在花的输入（pickUnspents 命中）→ 隐藏，不计入任何余额
+      //      （这些 UTXO 即将离开钱包）
+      //   2. 自己 pending tx 的找零（解析 rawtx 得到，可能尚未上链）→ 可用
+      //   3. on-chain UTXO 的 txid 是自己历史发出的某笔交易 → 可用（自己找零，跳过确认数）
+      //   4. 别人发给我的 UTXO，确认数 ≥ confirmations → 可用
+      //   5. 别人发给我的 UTXO，确认数不足 → 待确认（lockBalance）
+      //   6. 内存池中别人发给我的（不在 scantxoutset，由 Explorer 检测） → memPoolBalance
+      //      该项不在 setUpdateBalance 中维护，由 wallet-home 调 setMemPoolBalance 写入
       setUpdateBalance: async () => {
         const address = get().wallet.address
-        const pendingTransactions = get().pendingTransactions
         if (!address) return
         try {
           const res = await getScantxoutsetApi(address)
-          if (res.data.success) {
-            const resData = res.data.rpcData
-            const currentHeight = resData.height
+          if (!res.data.success) return
 
-            // 计算可用余额
-            const unspents = resData.unspents
-            for (const unspent of unspents) {
-              unspent.isHasMemPool = false
-              // 判断是不是自己的找零交易
-              const isFindZero = pendingTransactions.find((tx) => {
-                return tx.id === unspent.txid
-              })
-              if (unspent.height < currentHeight - get().confirmations || isFindZero) {
-                unspent.isUsable = true
-              } else {
-                unspent.isUsable = false
+          const resData = res.data.rpcData
+          const currentHeight = resData.height
+          const confirmations = get().confirmations
+
+          // 当前所有 pendingTransaction 占用的输入集合（只算 pending 状态的——
+          // confirmed 的虽然还在数组里但其 input 早已不在 UTXO 集中）
+          const pendingPicked = new Set<string>()
+          // 历史发出过的所有 txid（pending + 较新的 confirmed）—— 用作"自己找零"判定
+          const ownSentTxids = new Set<string>()
+          for (const tx of get().pendingTransactions) {
+            ownSentTxids.add(tx.id)
+            if (tx.status === 'pending') {
+              for (const u of tx.pickUnspents) {
+                pendingPicked.add(`${u.txid}:${u.vout}`)
               }
             }
-            // const wallet = get().wallet
-            // 计算可用余额
-            const usableBalance = unspents.reduce((acc, cur) => {
-              if (cur.isUsable) {
-                acc = acc.plus(new Decimal(cur.amount))
-              }
-              return acc
-            }, new Decimal(0))
-
-            const lockBalance = new Decimal(resData.total_amount).minus(usableBalance)
-
-            set((state) => {
-              state.wallet.balance = resData.total_amount
-              state.wallet.usableBalance = usableBalance.toNumber()
-              state.wallet.lockBalance = lockBalance.toNumber()
-            })
-            get().setUnspent(unspents)
           }
+
+          // ===== 第一步：处理 scantxoutset 返回的链上 UTXO =====
+          const unifiedUnspents: Unspent[] = []
+          for (const u of resData.unspents) {
+            const key = `${u.txid}:${u.vout}`
+            // 1. 自己 pending tx 正在花的，跳过（隐藏）
+            if (pendingPicked.has(key)) continue
+
+            // 2. 判断"自己找零"：UTXO 来自自己发出过的交易
+            const isOwnChange = ownSentTxids.has(u.txid)
+            // 3. 否则按确认数判定
+            const meetsConfirmations = u.height < currentHeight - confirmations
+
+            unifiedUnspents.push({
+              ...u,
+              isUsable: isOwnChange || meetsConfirmations,
+              isHasMemPool: false
+            })
+          }
+
+          // ===== 第二步：从自己 pending tx 的 rawtx 中解析虚拟找零 UTXO =====
+          // 这些 UTXO 还没在 scantxoutset 里出现（因为对应交易在内存池中尚未上链），
+          // 但用户应该可以立即看到 / 立即花。
+          // 注意：必须检查 pendingPicked，因为虚拟 UTXO 自己也可能被另一笔 pending
+          // tx 花掉（比如 tx1 的找零被 tx2 当成输入），那种情况下绝不能再加回来，
+          // 否则下一轮选 UTXO 会选到一个已经被 mempool 锁定的输入，广播必然命中
+          // txn-mempool-conflict (-26)。
+          const onchainKeys = new Set(unifiedUnspents.map((u) => `${u.txid}:${u.vout}`))
+          for (const tx of get().pendingTransactions) {
+            if (tx.status !== 'pending' || !tx.rawtx) continue
+            const myOuts = extractMyOutputsFromRawtx(tx.rawtx, address, tx.id)
+            for (const out of myOuts) {
+              const key = `${out.txid}:${out.vout}`
+              if (onchainKeys.has(key)) continue // 已经在 scantxoutset 里了
+              if (pendingPicked.has(key)) continue // 自己已被另一笔 pending tx 花掉
+              unifiedUnspents.push({
+                ...out,
+                isUsable: true,
+                isHasMemPool: false
+              })
+              onchainKeys.add(key)
+            }
+          }
+
+          // ===== 第三步：算 4 个余额字段（守恒）=====
+          let usable = new Decimal(0)
+          let lock = new Decimal(0)
+          for (const u of unifiedUnspents) {
+            if (u.isUsable) usable = usable.plus(u.amount)
+            else lock = lock.plus(u.amount)
+          }
+
+          // ===== 第四步：清理已不需要的 confirmed pendingTransaction =====
+          // 一笔 confirmed 的 pending tx 被保留下来主要是为了"自己找零跳过确认数"判定。
+          // 当其所有产物都已在 scantxoutset 中且确认数足够，就没必要再保留了。
+          const onchainTxids = new Set(resData.unspents.map((u) => u.txid))
+          const keepPendingTxs = get().pendingTransactions.filter((ptx) => {
+            if (ptx.status === 'pending') return true
+            // confirmed：检查这笔 tx 的所有产物是否都已经"够老了"
+            if (!onchainTxids.has(ptx.id)) {
+              // 链上已经看不到这笔 tx 的任何产物了（被花光了），可以丢
+              return false
+            }
+            // 还在链上，看看是不是已经够老
+            const stillYoung = resData.unspents.some(
+              (u) => u.txid === ptx.id && u.height >= currentHeight - confirmations
+            )
+            return stillYoung
+          })
+
+          set((state) => {
+            state.unspent = unifiedUnspents
+            state.wallet.balance = usable.plus(lock).plus(state.wallet.memPoolBalance ?? 0).toNumber()
+            state.wallet.usableBalance = usable.toNumber()
+            state.wallet.lockBalance = lock.toNumber()
+            // memPoolBalance 由 wallet-home 的 Explorer 检测维护，不在此处覆盖
+            if (keepPendingTxs.length !== state.pendingTransactions.length) {
+              state.pendingTransactions = keepPendingTxs
+            }
+            if (res.data.nodeInfo) {
+              state.nodeInfo = {
+                status: 'connected',
+                endpoint: res.data.nodeInfo.endpoint,
+                responseTime: res.data.nodeInfo.responseTime
+              }
+            }
+          })
         } catch (error) {
           console.log('获取当前账号余额 错误：', error)
         }
       },
 
-      // 通过内存池中的记录来锁定交易
+      // ===== 广播完交易后立即调用，不等下次 setUpdateBalance =====
+      // 用现有的 state.unspent + state.pendingTransactions 重新分类，
+      // 给用户即时反馈"刚发的钱不见了 + 找零马上可用"。
+      // 注意：本函数不发起任何网络请求，纯本地计算。
       setUpdateBalanceByMemPool: () => {
-  
         set((state) => {
+          if (!state.wallet.address) return
+          if (state.unspent.length === 0 && state.pendingTransactions.length === 0) return
+
+          const pendingPicked = new Set<string>()
+          const ownSentTxids = new Set<string>()
           for (const tx of state.pendingTransactions) {
+            ownSentTxids.add(tx.id)
             if (tx.status === 'pending') {
-              for (const pickUnspent of tx.pickUnspents) {
-                const unspent = state.unspent.find((item) => item.txid === pickUnspent.txid)
-                if (unspent) {
-                  unspent.isHasMemPool = true
-                }
-              }
-            } else if (tx.status === 'confirmed') {
-              for (const pickUnspent of tx.pickUnspents) {
-                const unspent = state.unspent.find((item) => item.txid === pickUnspent.txid)
-                if (unspent) {
-                  // 在状态更新中直接过滤掉要删除的unspent
-                  state.unspent = state.unspent.filter(item => item.txid !== unspent.txid);
-                }
+              for (const u of tx.pickUnspents) {
+                pendingPicked.add(`${u.txid}:${u.vout}`)
               }
             }
           }
-          
-  
 
-          state.wallet.usableBalance = state.unspent
-            .reduce((acc, cur) => {
-              if (cur.isUsable && !cur.isHasMemPool) {
-                return acc.plus(new Decimal(cur.amount))
-              }
-              return acc
-            }, new Decimal(0))
-            .toNumber()
+          // 在现有 state.unspent 基础上：
+          //   - 移除被 pending tx 占用的 UTXO（即将离开钱包）
+          //   - 加入新 pending tx 的找零虚拟 UTXO（如果还没在数组里）
+          const filtered = state.unspent.filter((u) => !pendingPicked.has(`${u.txid}:${u.vout}`))
+          const existingKeys = new Set(filtered.map((u) => `${u.txid}:${u.vout}`))
 
-          state.wallet.memPoolLockBalance = state.unspent
-            .reduce((acc, cur) => {
-              if (cur.isHasMemPool) {
-                return acc.plus(new Decimal(cur.amount))
-              }
-              return acc
-            }, new Decimal(0))
+          for (const tx of state.pendingTransactions) {
+            if (tx.status !== 'pending' || !tx.rawtx) continue
+            const myOuts = extractMyOutputsFromRawtx(tx.rawtx, state.wallet.address, tx.id)
+            for (const out of myOuts) {
+              const key = `${out.txid}:${out.vout}`
+              if (existingKeys.has(key)) continue
+              if (pendingPicked.has(key)) continue // 自己已被另一笔 pending tx 花掉，跳过
+              filtered.push({ ...out, isUsable: true, isHasMemPool: false })
+              existingKeys.add(key)
+            }
+          }
+
+          state.unspent = filtered
+
+          // 重新算余额。注意：state.unspent 中条目的 isUsable 已经在 setUpdateBalance
+          // 时按"自己找零 / 确认数"规则确定好了；这里只做求和。
+          let usable = new Decimal(0)
+          let lock = new Decimal(0)
+          for (const u of filtered) {
+            if (u.isUsable) usable = usable.plus(u.amount)
+            else lock = lock.plus(u.amount)
+          }
+
+          state.wallet.usableBalance = usable.toNumber()
+          state.wallet.lockBalance = lock.toNumber()
+          state.wallet.balance = usable.plus(lock).plus(state.wallet.memPoolBalance ?? 0).toNumber()
+        })
+      },
+
+      // ===== 内存池中"别人发给我"的金额 =====
+      // 由 wallet-home 拉 Explorer 的地址交易历史时调用——过滤出 type=income &&
+      // confirmations=0 的，把 netAmount 加起来传过来。
+      setMemPoolBalance: (memPool: number) => {
+        set((state) => {
+          state.wallet.memPoolBalance = memPool
+          state.wallet.balance = new Decimal(state.wallet.usableBalance)
+            .plus(state.wallet.lockBalance)
+            .plus(memPool)
             .toNumber()
         })
+      },
+
+      // 币价：直连 Explorer 公共接口
+      setUpdateCoinPrice: async () => {
+        try {
+          const res = await getCoinPriceApi()
+          if (res.data.success) {
+            const info = res.data.rpcData
+            set((state) => {
+              state.coinPriceInfo = info
+              state.coinPrice = String(info.price ?? 0)
+              state.blockchainInfo.coinPrice = String(info.price ?? 0)
+            })
+          }
+        } catch (error) {
+          console.log('获取币价 错误：', error)
+        }
       }
     })),
     {
-      name: 'wallet-storage', // 本地存储的 key
-      storage: createJSONStorage(() => localStorage), // 使用 localStorage
-      // 只持久化部分状态，排除敏感信息
+      name: 'wallet-storage',
+      storage: createJSONStorage(() => localStorage),
+      // 余额相关字段全部不持久化：每次启动从 RPC + Explorer 重新拉取
+      // （旧版本会持久化 balance/usable/lock/memPool，导致重启时一段时间显示
+      //   过时数据；既然首次拉取很快，干脆都不持久化）
       partialize: (state) => ({
-        wallet: state.wallet,
+        wallet: {
+          isHasWallet: state.wallet.isHasWallet,
+          address: state.wallet.address,
+          encryptedWallet: state.wallet.encryptedWallet,
+          balance: 0,
+          usableBalance: 0,
+          lockBalance: 0,
+          memPoolBalance: 0
+        },
         pendingTransactions: state.pendingTransactions,
         transactions: state.transactions,
         isInitialized: state.isInitialized,
-        isLocked: state.isLocked,
-        coinPrice: state.coinPrice,
-        // unspent: state.unspent
+        isLocked: state.isLocked
+        // 不再持久化 coinPrice、coinPriceInfo（每次启动 22 秒内会刷新一次）
       })
     }
   )
 )
 
-// 导出类型
 export type { WalletInfo, Transaction, WalletState }
 
-// 钱包操作的 hooks - 类似 Pinia 的组合式 API
 export const useWalletActions = () => {
   const store = useWalletStore()
 
@@ -460,47 +595,49 @@ export const useWalletActions = () => {
     clearWallet: store.clearWallet,
     setLoading: store.setLoading,
     setError: store.setError,
+    setExplorerInfo: store.setExplorerInfo,
 
     getBaseFee: store.getBaseFee,
 
     unSetUpdate: store.unSetUpdate,
     setUpdateBlockchaininfo: store.setUpdateBlockchaininfo,
     setUpdateBalance: store.setUpdateBalance,
-    setUpdateBalanceByMemPool: store.setUpdateBalanceByMemPool
+    setUpdateBalanceByMemPool: store.setUpdateBalanceByMemPool,
+    setUpdateCoinPrice: store.setUpdateCoinPrice,
+    setMemPoolBalance: store.setMemPoolBalance
   }
 }
 
-// 钱包状态的 hooks - 使用单独的选择器避免无限循环
 export const useWalletState = () => {
   const blockchainInfo = useWalletStore((state) => state.blockchainInfo)
+  const nodeInfo = useWalletStore((state) => state.nodeInfo)
+  const explorerInfo = useWalletStore((state) => state.explorerInfo)
   const wallet = useWalletStore((state) => state.wallet)
   const unspent = useWalletStore((state) => state.unspent)
   const transactions = useWalletStore((state) => state.transactions)
   const pendingTransactions = useWalletStore((state) => state.pendingTransactions)
   const confirmations = useWalletStore((state) => state.confirmations)
   const coinPrice = useWalletStore((state) => state.coinPrice)
+  const coinPriceInfo = useWalletStore((state) => state.coinPriceInfo)
   const isInitialized = useWalletStore((state) => state.isInitialized)
   const isLoading = useWalletStore((state) => state.isLoading)
   const error = useWalletStore((state) => state.error)
   const isLocked = useWalletStore((state) => state.isLocked)
-  // const recentTransactions = useWalletStore((state) => state.getRecentTransactions())
-  // const formattedBalance = useWalletStore((state) => state.getFormattedBalance())
-  // const isConnected = useWalletStore((state) => state.isWalletConnected())
 
   return {
     blockchainInfo,
+    nodeInfo,
+    explorerInfo,
     wallet,
     unspent,
     transactions,
     pendingTransactions,
     confirmations,
     coinPrice,
+    coinPriceInfo,
     isInitialized,
     isLoading,
     error,
     isLocked
-    // recentTransactions,
-    // formattedBalance,
-    // isConnected
   }
 }

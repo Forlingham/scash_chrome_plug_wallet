@@ -46,8 +46,8 @@ export function WalletReceive({ onNavigate }: WalletReceiveProps) {
   const shareAddress = () => {
     if (navigator.share) {
       navigator.share({
-        title: 'SCASH Wallet Address',
-        text: `Send ${NAME_TOKEN} to: ${wallet.address}`
+        title: t('receive.shareTitle'),
+        text: `${t('receive.shareText')} ${NAME_TOKEN}: ${wallet.address}`
       })
     } else {
       copyAddress()

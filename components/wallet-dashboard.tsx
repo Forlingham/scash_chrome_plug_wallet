@@ -3,12 +3,13 @@
 import { LanguageSelector } from '@/components/language-selector'
 import { Button } from '@/components/ui/button'
 import { WalletAssets } from '@/components/wallet-assets'
+import { WalletEngrave } from '@/components/wallet-engrave'
 import { WalletHome } from '@/components/wallet-home'
 import { WalletReceive } from '@/components/wallet-receive'
 import { WalletSend } from '@/components/wallet-send'
 import { WalletSettings } from '@/components/wallet-settings'
 import { useLanguage } from '@/contexts/language-context'
-import { useWalletActions, useWalletState } from '@/stores/wallet-store'
+import { useWalletActions } from '@/stores/wallet-store'
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -20,15 +21,17 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
   const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState('home')
   const [currentView, setCurrentView] = useState('home')
-  const { pendingTransactions,unspent } = useWalletState()
-  const { setUpdateBlockchaininfo, setUpdateBalance, setUpdateBalanceByMemPool } = useWalletActions()
+  const { setUpdateBlockchaininfo, setUpdateBalance, setUpdateCoinPrice } = useWalletActions()
 
   const initGetWalletInfo = async () => {
-    await setUpdateBlockchaininfo()
-    await setUpdateBalance()
-    if (pendingTransactions.length) {
-      setUpdateBalanceByMemPool()
-    }    
+    // setUpdateBalance 已经把"自己 pending tx 锁定的输入 + 找零虚拟 UTXO + 自己找零跳过确认数"
+    // 全部内置处理；不再需要单独调用 setUpdateBalanceByMemPool。
+    // 内存池入账的检测在 wallet-home 里通过 Explorer 单独维护。
+    await Promise.all([
+      setUpdateBlockchaininfo(),
+      setUpdateBalance(),
+      setUpdateCoinPrice().catch(() => undefined)
+    ])
   }
 
   useEffect(() => {
@@ -37,6 +40,7 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
       initGetWalletInfo()
     }, 1000 * 22)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleNavigation = (view: string) => {
@@ -60,6 +64,8 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
         return <WalletReceive onNavigate={handleNavigation} />
       case 'send':
         return <WalletSend onNavigate={handleNavigation} />
+      case 'engrave':
+        return <WalletEngrave onNavigate={handleNavigation} />
       case 'settings':
         return <WalletSettings onNavigate={handleNavigation} onLockWallet={handleLockWallet} />
       case 'buy':
@@ -68,16 +74,14 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
         return (
           <div className="flex-1 flex items-center justify-center p-4">
             <div className="text-center">
-              <h2 className="text-xl font-semibold text-white mb-2">
-                {currentView.charAt(0).toUpperCase() + currentView.slice(1)} Feature
-              </h2>
-              <p className="text-gray-400 mb-4">This feature will be implemented soon.</p>
+              <h2 className="text-xl font-semibold text-white mb-2">{t('common.featureComingSoon')}</h2>
+              <p className="text-gray-400 mb-4">{t('common.featureComingSoonDesc')}</p>
               <Button
                 onClick={() => handleNavigation('home')}
                 variant="outline"
                 className="border-gray-600 text-gray-300 hover:bg-gray-700"
               >
-                Back to Home
+                {t('send.backToHome')}
               </Button>
             </div>
           </div>
@@ -105,6 +109,7 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                   {currentView === 'receive' && t('receive.title')}
                   {currentView === 'send' && t('action.send')}
+                  {currentView === 'engrave' && t('action.engrave')}
                   {currentView === 'assets' && t('nav.assets')}
                   {currentView === 'settings' && t('settings.title')}
                   {['buy', 'sell', 'trade'].includes(currentView) &&

@@ -1,12 +1,27 @@
+// 全局类型定义。与 web 钱包 (scash_web_wallet_next.js) 保持同源结构，
+// 方便两端共用业务组件。
+
 interface ApiData<T> {
   message: string
   code: number
   data: T
 }
 
+// 节点连接信息：每次成功调用 RPC 都会附带，用于驱动 UI 信号强度展示。
+// status 字段由 wallet-store 维护（rpc-client 不直接写）：
+//   - 'checking'：尚未发起任何调用 / 正在调用中
+//   - 'connected'：最近一次调用成功
+//   - 'disconnected'：最近一次调用全部节点都失败
+interface NodeInfo {
+  status: 'connected' | 'checking' | 'disconnected'
+  endpoint: string
+  responseTime: number
+}
+
 interface RpcRes<T> {
   success: boolean
   rpcData: T
+  nodeInfo?: NodeInfo
   error?: {
     error: {
       code: number
@@ -34,3 +49,83 @@ interface SendList {
   address: string
   amount: string
 }
+
+// ========== 区块浏览器 (Explorer) 富交易历史相关类型 ==========
+
+interface PageType<T> {
+  list: T[]
+  pagination: Pagination
+}
+
+interface Pagination {
+  page: number
+  pageSize: number
+  total: number
+}
+
+interface Sender {
+  address: string
+  amount: number
+  txid?: string
+  vout?: number
+}
+
+interface TransactionVout {
+  value: number
+  n: number
+  scriptPubKey?: {
+    hex?: string
+    address?: string
+    type?: string
+  }
+  addresses?: string[]
+}
+
+interface TransactionType {
+  txid: string
+  blockHeight: number
+  size: number
+  weight: number
+  senders: Sender[]
+  receivers: Sender[]
+  changeOutputs: Sender[]
+  totalAmount: number
+  fee: number
+  timestamp: string
+  confirmations: number
+  vouts?: TransactionVout[]
+}
+
+interface AddressTransactionsType {
+  address: string
+}
+
+// ========== DAP 链上消息相关类型 ==========
+
+interface DapOutputsResult {
+  outputs: { address: string; amount: string }[]
+  dapAmount: number
+  chunkCount: number
+}
+
+
+// ========== Chrome 扩展 API（最小化 ambient 声明） ==========
+// 我们只用到 chrome.permissions 的 contains / request。
+// 不引 @types/chrome（体积大且大部分用不到），只声明实际用到的部分。
+// 在 next dev 普通页面环境下 chrome 为 undefined，所以类型是 union with undefined。
+
+interface ChromePermissionsRequest {
+  origins?: string[]
+  permissions?: string[]
+}
+
+interface ChromePermissionsApi {
+  contains: (perms: ChromePermissionsRequest) => Promise<boolean>
+  request: (perms: ChromePermissionsRequest) => Promise<boolean>
+}
+
+interface ChromeNamespace {
+  permissions?: ChromePermissionsApi
+}
+
+declare const chrome: ChromeNamespace | undefined

@@ -1,6 +1,7 @@
 'use client'
 
-import { LanguageProvider, useLanguage } from '@/contexts/language-context'
+import { useLanguage } from '@/contexts/language-context'
+import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 
 export function WalletLockScreen({ onUnlock }: { onUnlock: (password: string) => boolean }) {
@@ -8,18 +9,28 @@ export function WalletLockScreen({ onUnlock }: { onUnlock: (password: string) =>
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
   const handleUnlock = () => {
-    // Mock password verification
-    if (password.length >= 8) {
+    // 任何长度都尝试一次（< 8 也不预先放过/拦截，让后端密码学校验来判定）。
+    // 如果后端 onUnlock 抛错（理论上不应该，但 try/catch 兜一下做防御），
+    // 一律视为密码错误。
+    if (!password) {
+      setError(t('wallet.lock.error'))
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
       const isUnlocked = onUnlock(password)
-      if (isUnlocked) {
-        setError('')
-      } else {
+      if (!isUnlocked) {
         setError(t('wallet.lock.error'))
       }
-    } else {
+    } catch (e) {
+      console.warn('解锁过程异常：', e)
       setError(t('wallet.lock.error'))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -43,17 +54,20 @@ export function WalletLockScreen({ onUnlock }: { onUnlock: (password: string) =>
               value={password}
               onChange={(e) => {
                 setPassword(e.target.value)
-                setError('')
+                if (error) setError('')
               }}
               className="w-full p-4 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-purple-500 focus:outline-none"
-              placeholder="Enter wallet password"
-              onKeyPress={(e) => e.key === 'Enter' && handleUnlock()}
+              placeholder={t('wallet.lock.input')}
+              onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+              autoFocus
             />
             <button
+              type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
-              {showPassword ? '🙈' : '👁️'}
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
             </button>
           </div>
 
@@ -61,10 +75,10 @@ export function WalletLockScreen({ onUnlock }: { onUnlock: (password: string) =>
 
           <button
             onClick={handleUnlock}
-            disabled={!password}
+            disabled={!password || busy}
             className="w-full p-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:text-gray-400 text-white rounded-lg font-medium transition-colors"
           >
-            {t('wallet.lock.unlock')}
+            {busy ? '...' : t('wallet.lock.unlock')}
           </button>
         </div>
       </div>

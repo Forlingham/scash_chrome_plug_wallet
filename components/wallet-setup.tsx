@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useLanguage } from '@/contexts/language-context'
 import { useToast } from '@/hooks/use-toast'
-import { decryptWallet, downloadWalletFile, encryptWallet, passwordMD5, SCASH_NETWORK } from '@/lib/utils'
+import { decryptWallet, downloadWalletFile, encryptWallet, normalizeMnemonic, passwordMD5, SCASH_NETWORK } from '@/lib/utils'
 import { useWalletActions, useWalletStore, type WalletInfo } from '@/stores/wallet-store'
 import { BIP32Factory } from 'bip32'
 import * as bip39 from 'bip39'
@@ -161,7 +161,7 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
       address: address!,
       balance: 0,
       lockBalance: 0,
-      memPoolLockBalance: 0,
+      memPoolBalance: 0,
       usableBalance: 0,
       encryptedWallet: encryptedWallet
     }
@@ -175,8 +175,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
   const handleDownloadWallet = () => {
     if (!walletInfo || !walletInfo.encryptedWallet) {
       toast({
-        title: 'Error',
-        description: 'Wallet not encrypted',
+        title: t('common.error'),
+        description: t('setup.error.notEncrypted'),
         variant: 'destructive'
       })
       return
@@ -188,8 +188,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
     setWallet(walletInfo)
 
     toast({
-      title: 'Wallet Created Successfully',
-      description: 'Your wallet file has been downloaded. Keep it safe!'
+      title: t('setup.success.created'),
+      description: t('setup.success.createdDesc')
     })
 
     onWalletCreated()
@@ -216,15 +216,15 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
         } else {
           // 钱包文件有问题
           toast({
-            title: 'Invalid Wallet File',
-            description: 'The selected file is not a valid wallet file.',
+            title: t('setup.error.invalidWalletFile'),
+            description: t('setup.error.invalidWalletFileDesc'),
             variant: 'destructive'
           })
         }
       } catch (error) {
         toast({
-          title: 'Invalid Wallet File',
-          description: 'The selected file is not a valid wallet file.',
+          title: t('setup.error.invalidWalletFile'),
+          description: t('setup.error.invalidWalletFileDesc'),
           variant: 'destructive'
         })
       }
@@ -243,8 +243,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
 
     if (!uploadedWalletEncrypted) {
       toast({
-        title: 'Invalid Wallet File',
-        description: 'The selected file is not a valid wallet file.',
+        title: t('setup.error.invalidWalletFile'),
+        description: t('setup.error.invalidWalletFileDesc'),
         variant: 'destructive'
       })
       return
@@ -256,8 +256,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
 
       if (!decryptedWallet.isSuccess) {
         toast({
-          title: 'Invalid Password',
-          description: 'The password you entered is incorrect.',
+          title: t('setup.error.invalidPassword'),
+          description: t('setup.error.invalidPasswordDesc'),
           variant: 'destructive'
         })
         return
@@ -268,7 +268,7 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
         address: decryptedWallet.wallet!.address,
         balance: 0,
         lockBalance: 0,
-        memPoolLockBalance: 0,
+        memPoolBalance: 0,
         usableBalance: 0,
         encryptedWallet: uploadedWalletEncrypted
       }
@@ -278,8 +278,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
       onWalletCreated()
     } catch (error) {
       toast({
-        title: 'Invalid Password',
-        description: 'The password you entered is incorrect.',
+        title: t('setup.error.invalidPassword'),
+        description: t('setup.error.invalidPasswordDesc'),
         variant: 'destructive'
       })
       return
@@ -287,15 +287,37 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
   }
 
   const handleRestoreFromMnemonic = () => {
-    if (generatedMnemonic.split(' ').length !== 12) {
+    // 1. 把用户粘贴 / 输入的助记词规整：去首尾空白、把任意空白合并为单空格、转小写。
+    //    可以容错以下常见情况：
+    //      - 多个空格分隔
+    //      - 用换行符 / Tab 分隔（从某些备份纸或文件复制时）
+    //      - 全角空格 / 零宽字符
+    //      - 大小写混用
+    const normalized = normalizeMnemonic(generatedMnemonic)
+    const words = normalized ? normalized.split(' ') : []
+
+    // 2. 词数检查（BIP39 12/15/18/21/24 都合法，这里只支持 12 词，与生成端保持一致）
+    if (words.length !== 12) {
       toast({
-        title: 'Invalid Mnemonic',
-        description: 'Please enter a valid 12-word mnemonic phrase.',
+        title: t('wallet.invalidMnemonic'),
+        description: t('wallet.invalidMnemonicWordCount').replace('{n}', String(words.length)),
         variant: 'destructive'
       })
       return
     }
 
+    // 3. BIP39 词表 + 校验和验证：验不过说明用户敲错了某个单词或顺序错了
+    if (!bip39.validateMnemonic(normalized)) {
+      toast({
+        title: t('wallet.invalidMnemonic'),
+        description: t('wallet.invalidMnemonicChecksum'),
+        variant: 'destructive'
+      })
+      return
+    }
+
+    // 4. 把规整后的助记词回写到 state，下一步的 handlePasswordSubmit 会用到
+    setGeneratedMnemonic(normalized)
     setStep('set-password')
   }
 
@@ -304,8 +326,8 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
 
     navigator.clipboard.writeText(text)
     toast({
-      title: 'Copied to Clipboard',
-      description: 'Mnemonic phrase has been copied to clipboard.'
+      title: t('setup.copy.mnemonic'),
+      description: t('setup.copy.mnemonicDesc')
     })
   }
 
@@ -431,7 +453,7 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
                           setUserVerification(newVerification)
                         }}
                         className="bg-gray-900 border-gray-600 text-white"
-                        placeholder="Enter word"
+                        placeholder={t('setup.placeholder.enterWord')}
                       />
                     </div>
                   ))}
