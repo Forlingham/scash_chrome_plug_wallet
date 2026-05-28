@@ -360,6 +360,42 @@ export const analyzeTransaction = (tx: TransactionType, currentAddress: string) 
 }
 
 // =============================================================================
+// 从已签名的 rawtx 中提取所有发到 myAddress 的输出
+// 用途：自己刚发的交易在内存池中时，scantxoutset 还看不到这笔交易的输出，
+//       但找零本来就属于自己，应该立即可用。这个函数把 rawtx 解出来，
+//       挑出我自己的输出（找零或自转），构造成"伪 UTXO"加进余额计算中。
+// =============================================================================
+export function extractMyOutputsFromRawtx(rawtx: string, myAddress: string, txid: string): Unspent[] {
+  if (!rawtx || !myAddress) return []
+  try {
+    const tx = bitcoin.Transaction.fromHex(rawtx)
+    const myPayment = bitcoin.payments.p2wpkh({ address: myAddress, network: SCASH_NETWORK })
+    if (!myPayment.output) return []
+    const myScript = myPayment.output
+
+    const result: Unspent[] = []
+    for (let i = 0; i < tx.outs.length; i++) {
+      const out = tx.outs[i]
+      if (Buffer.compare(out.script, myScript) === 0) {
+        result.push({
+          txid,
+          vout: i,
+          scriptPubKey: out.script.toString('hex'),
+          desc: '',
+          amount: satToScash(out.value),
+          coinbase: false,
+          height: 0 // 还没上链
+        })
+      }
+    }
+    return result
+  } catch (e) {
+    console.warn('解析 rawtx 提取我方输出失败:', e)
+    return []
+  }
+}
+
+// =============================================================================
 // BIP32 工具：从助记词派生第一条 P2WPKH 路径
 // =============================================================================
 export const ADDRESS_PATH = "m/84'/0'/0'/0/0"

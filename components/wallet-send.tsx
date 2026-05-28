@@ -98,7 +98,9 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
   }
 
   useEffect(() => {
-    setUpdateBalanceByMemPool()
+    // 进入发送页时只拉一次费率；余额由 wallet-dashboard 的 22 秒定时器维护，
+    // 不需要在这里再调 setUpdateBalanceByMemPool（容易在 state.unspent 还没填充时
+    // 把余额清零，反而出问题）。
     getInitData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -425,6 +427,9 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       }
       await sleep(1533)
       addPendingTransaction(pendingTransaction)
+      // 立即重算余额，让用户回到首页能立刻看到"找零已可用 + 输入已扣除"，
+      // 而不是等下一次 22 秒刷新。
+      setUpdateBalanceByMemPool()
       setCurrentPendingTransaction(pendingTransaction)
       setStep('success')
       setIsSliding(false)

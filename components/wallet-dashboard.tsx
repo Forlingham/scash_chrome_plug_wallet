@@ -9,7 +9,7 @@ import { WalletReceive } from '@/components/wallet-receive'
 import { WalletSend } from '@/components/wallet-send'
 import { WalletSettings } from '@/components/wallet-settings'
 import { useLanguage } from '@/contexts/language-context'
-import { useWalletActions, useWalletState } from '@/stores/wallet-store'
+import { useWalletActions } from '@/stores/wallet-store'
 import { ArrowLeft } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -21,19 +21,17 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
   const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState('home')
   const [currentView, setCurrentView] = useState('home')
-  const { pendingTransactions } = useWalletState()
-  const { setUpdateBlockchaininfo, setUpdateBalance, setUpdateBalanceByMemPool, setUpdateCoinPrice } = useWalletActions()
+  const { setUpdateBlockchaininfo, setUpdateBalance, setUpdateCoinPrice } = useWalletActions()
 
   const initGetWalletInfo = async () => {
-    // 三件套并行：链状态 / 余额扫描 / 币价；币价失败不影响其它两者
+    // setUpdateBalance 已经把"自己 pending tx 锁定的输入 + 找零虚拟 UTXO + 自己找零跳过确认数"
+    // 全部内置处理；不再需要单独调用 setUpdateBalanceByMemPool。
+    // 内存池入账的检测在 wallet-home 里通过 Explorer 单独维护。
     await Promise.all([
       setUpdateBlockchaininfo(),
       setUpdateBalance(),
       setUpdateCoinPrice().catch(() => undefined)
     ])
-    if (pendingTransactions.length) {
-      setUpdateBalanceByMemPool()
-    }
   }
 
   useEffect(() => {

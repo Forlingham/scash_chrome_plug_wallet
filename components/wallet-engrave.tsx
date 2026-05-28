@@ -77,7 +77,7 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
   }
 
   useEffect(() => {
-    setUpdateBalanceByMemPool()
+    // 同 wallet-send：只拉费率，不再调 setUpdateBalanceByMemPool
     getInitData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -240,6 +240,8 @@ export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
       }
       await sleep(1533)
       addPendingTransaction(pendingTransaction)
+      // 立即重算余额（同 wallet-send）
+      setUpdateBalanceByMemPool()
       setCurrentPendingTransaction(pendingTransaction)
       setStep('success')
       setPassword('')

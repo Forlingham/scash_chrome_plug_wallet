@@ -93,7 +93,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       address: wallet.address,
       balance: wallet.balance,
       lockBalance: wallet.lockBalance,
-      memPoolLockBalance: wallet.memPoolLockBalance,
+      memPoolBalance: wallet.memPoolBalance,
       usableBalance: wallet.usableBalance,
       encryptedWallet: walletEncrypt
     }

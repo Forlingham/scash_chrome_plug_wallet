@@ -161,7 +161,7 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
       address: address!,
       balance: 0,
       lockBalance: 0,
-      memPoolLockBalance: 0,
+      memPoolBalance: 0,
       usableBalance: 0,
       encryptedWallet: encryptedWallet
     }
@@ -268,7 +268,7 @@ export function WalletSetup({ onWalletCreated }: WalletSetupProps) {
         address: decryptedWallet.wallet!.address,
         balance: 0,
         lockBalance: 0,
-        memPoolLockBalance: 0,
+        memPoolBalance: 0,
         usableBalance: 0,
         encryptedWallet: uploadedWalletEncrypted
       }

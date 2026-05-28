@@ -28,7 +28,7 @@ interface WalletHomeProps {
 export function WalletHome({ onNavigate }: WalletHomeProps) {
   const { wallet, coinPrice, unspent, transactions, pendingTransactions, blockchainInfo, confirmations, isLocked, nodeInfo } =
     useWalletState()
-  const { addTransaction, addPendingTransaction, lockWallet } = useWalletActions()
+  const { addTransaction, addPendingTransaction, lockWallet, setMemPoolBalance } = useWalletActions()
   const { t } = useLanguage()
   const { toast } = useToast()
   const [getAddressTxsLoading, setGetAddressTxsLoading] = useState<boolean>(false)
@@ -53,7 +53,23 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
       setExplorerResponseTime(responseTime)
       setExplorerConnectionStatus('connected')
 
-      if (!res || !res.length) return
+      if (!res || !res.length) {
+        // 接口拉到了但是没数据，把内存池入账归零（这地址确实没收到内存池中的转账）
+        setMemPoolBalance(0)
+        return
+      }
+
+      // ===== 内存池入账检测 =====
+      // 别人发我的、还没上链的（confirmations === 0 && type=income）
+      // 自己找零虽然 confirmations 也可能是 0，但 analyzeTransaction 里会归到
+      // 'self' 或 'expense'，不会是 'income'，所以这里筛得干净。
+      let memPoolIncoming = new Decimal(0)
+      for (const tx of res) {
+        if ((tx.confirmations ?? 0) === 0 && tx.type === 'income') {
+          memPoolIncoming = memPoolIncoming.plus(new Decimal(tx.netAmount || 0))
+        }
+      }
+      setMemPoolBalance(memPoolIncoming.toNumber())
 
       // 解析 DAP 消息
       const newDapMessages = new Map<string, DapMessage>()
@@ -289,7 +305,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
             </div>
             <div className="bg-blue-500/5 rounded-lg p-2 text-center">
               <div className="text-blue-400/80 font-medium text-[10px] uppercase tracking-wide">{t('wallet.memPool')}</div>
-              <div className="text-white font-semibold text-sm mt-0.5">{wallet.memPoolLockBalance}</div>
+              <div className="text-white font-semibold text-sm mt-0.5">{wallet.memPoolBalance}</div>
             </div>
           </div>
         </div>
@@ -354,7 +370,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
                 </div>
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-center">
                   <div className="text-blue-400 font-medium">{t('wallet.memPool')}</div>
-                  <div className="text-white font-semibold">{wallet.memPoolLockBalance}</div>
+                  <div className="text-white font-semibold">{wallet.memPoolBalance}</div>
                 </div>
               </div>
 
