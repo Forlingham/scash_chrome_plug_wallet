@@ -52,7 +52,6 @@ export const metadata: Metadata = {
   generator: "Next.js",
 };
 
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -61,27 +60,23 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-           <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#7B2EFF" /> 
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="manifest" href="/manifest.json" />
+        {/*
+          theme-color 改为 emerald-500 主色，匹配新视觉。
+          viewport 删除 maximum-scale + user-scalable=no（这是手机端禁缩放配置，
+          桌面插件不需要，且违反无障碍原则）。
+        */}
+        <meta name="theme-color" content="#10b981" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <style>{`
-html {
-  font-family: ${GeistSans.style.fontFamily};
-  --font-sans: ${GeistSans.variable};
-  --font-mono: ${GeistMono.variable};
-}
-
-/* 桌面端宽度限制 */
-@media (min-width: 768px) {
-  body {
-    max-width: 428px;
-    margin: 0 auto;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-  }
-}
+          html {
+            font-family: ${GeistSans.style.fontFamily};
+            --font-sans: ${GeistSans.variable};
+            --font-mono: ${GeistMono.variable};
+          }
         `}</style>
       </head>
-      <body className="antialiased bg-gray-900">
+      <body className="antialiased">
         {children}
         <Toaster />
       </body>

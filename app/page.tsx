@@ -3,26 +3,22 @@
 import { useState, useEffect } from 'react'
 import { WalletSetup } from '@/components/wallet-setup'
 import { WalletDashboard } from '@/components/wallet-dashboard'
-import { LanguageProvider, useLanguage } from '@/contexts/language-context'
+import { LanguageProvider } from '@/contexts/language-context'
 import { useWalletActions, useWalletStore } from '@/stores/wallet-store'
 import { WalletLockScreen } from '@/components/WalletLockScreen'
 
 export default function Home() {
   const { wallet, isLocked } = useWalletStore()
-  const { setWallet, setLoading, setError, lockWallet, unlockWallet } = useWalletActions()
+  const { lockWallet, unlockWallet } = useWalletActions()
   const [isLoading, setIsLoading] = useState<boolean>(true)
 
   useEffect(() => {
-    if (wallet.address) {
-      setIsLoading(false)
-    }
-    if (!wallet.address) {
-      setIsLoading(false)
-    }
+    // 不论 wallet 是否已存在，初始化拉完都关 loading
+    setIsLoading(false)
   }, [wallet])
 
   const handleWalletCreated = () => {
-    console.log('create')
+    // 钱包创建成功后由 wallet-setup 内部 setWallet，触发上面 useEffect
   }
 
   const handleLogout = () => {
@@ -35,15 +31,16 @@ export default function Home() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
+      <div className="h-full w-full bg-background flex items-center justify-center">
+        {/* 加载指示器：emerald 色环，小尺寸符合插件 */}
+        <div className="h-6 w-6 rounded-full border-2 border-zinc-800 border-t-emerald-500 animate-spin" />
       </div>
     )
   }
 
   return (
     <LanguageProvider>
-      <div className="min-h-screen bg-gray-900">
+      <div className="h-full w-full bg-background text-foreground">
         {!wallet.address ? (
           <WalletSetup onWalletCreated={handleWalletCreated} />
         ) : isLocked ? (

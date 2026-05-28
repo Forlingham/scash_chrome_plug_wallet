@@ -3,75 +3,93 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ==========================================================================
+   SCASH Chrome 钱包 设计系统
+   --------------------------------------------------------------------------
+   配色策略：
+   - 背景：zinc 系深色（zinc-950 / zinc-900 / zinc-800），呈现金融工具的克制
+   - 主色：emerald 翡翠绿（暗合 SCASH "S-CASH" 现金/财富语义）
+   - 次要色：sky 蓝（用于"接收/链上信息"等中性提示）
+   - 警示色：amber 琥珀（锁仓/待确认）、red 红（错误/失败）
+   - 字体节奏：base = 14px，整体比 Web 端密一档，符合插件场景
+   ========================================================================== */
+
 :root {
+  /* 浅色主题（保留以备将来开关，目前默认始终走 .dark） */
   --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --foreground: oklch(0.141 0.005 285);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.141 0.005 285);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.141 0.005 285);
+  --primary: oklch(0.696 0.17 162); /* emerald-500 */
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.967 0.001 286);
+  --secondary-foreground: oklch(0.21 0.006 286);
+  --muted: oklch(0.967 0.001 286);
+  --muted-foreground: oklch(0.552 0.016 286);
+  --accent: oklch(0.967 0.001 286);
+  --accent-foreground: oklch(0.21 0.006 286);
   --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.92 0.004 286);
+  --input: oklch(0.92 0.004 286);
+  --ring: oklch(0.696 0.17 162);
+  --radius: 0.5rem;
 }
 
 .dark {
-  --background: oklch(0.11 0 0); /* Darker background #1a1a1a */
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.15 0 0); /* Dark gray cards #262626 */
+  /* === 主体背景层级 === */
+  --background: oklch(0.141 0.005 285); /* zinc-950 */
+  --foreground: oklch(0.985 0 0); /* zinc-50 */
+
+  /* === 卡片层 === */
+  --card: oklch(0.21 0.006 286); /* zinc-900 */
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.15 0 0);
+  --popover: oklch(0.21 0.006 286);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.6 0.2 280); /* Purple primary matching logo */
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.2 0 0);
+
+  /* === 主色：emerald 翡翠绿 === */
+  --primary: oklch(0.696 0.17 162); /* emerald-500 */
+  --primary-foreground: oklch(0.141 0.005 285);
+
+  /* === 次级面板（按钮 secondary 等） === */
+  --secondary: oklch(0.274 0.006 286); /* zinc-800 */
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.2 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.55 0.15 180); /* Teal accent for interactive elements */
+
+  /* === 弱化背景（input/disabled） === */
+  --muted: oklch(0.274 0.006 286); /* zinc-800 */
+  --muted-foreground: oklch(0.705 0.015 286); /* zinc-400 */
+
+  /* === 强调（hover/选中） === */
+  --accent: oklch(0.274 0.006 286);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.55 0.2 15); /* Red for negative transactions */
+
+  /* === 危险/错误 === */
+  --destructive: oklch(0.637 0.237 25.331); /* red-500 */
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.2 0 0);
-  --input: oklch(0.2 0 0);
-  --ring: oklch(0.6 0.2 280);
-  --chart-1: oklch(0.55 0.15 140); /* Green for positive transactions */
-  --chart-2: oklch(0.55 0.15 180); /* Teal */
-  --chart-3: oklch(0.6 0.2 280); /* Purple */
-  --chart-4: oklch(0.55 0.2 15); /* Red */
-  --chart-5: oklch(0.7 0.15 60); /* Yellow */
-  --sidebar: oklch(0.15 0 0);
+
+  /* === 描边/输入框 === */
+  --border: oklch(0.274 0.006 286 / 60%); /* zinc-800 半透 */
+  --input: oklch(0.274 0.006 286);
+  --ring: oklch(0.696 0.17 162); /* emerald-500，键盘焦点环 */
+
+  /* === 图表色（保留多色，但偏中性） === */
+  --chart-1: oklch(0.696 0.17 162); /* emerald */
+  --chart-2: oklch(0.685 0.169 237); /* sky */
+  --chart-3: oklch(0.769 0.188 70); /* amber */
+  --chart-4: oklch(0.637 0.237 25); /* red */
+  --chart-5: oklch(0.6 0.18 280); /* violet */
+
+  /* === Sidebar（暂未使用，保留） === */
+  --sidebar: oklch(0.21 0.006 286);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.6 0.2 280);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.2 0 0);
+  --sidebar-primary: oklch(0.696 0.17 162);
+  --sidebar-primary-foreground: oklch(0.141 0.005 285);
+  --sidebar-accent: oklch(0.274 0.006 286);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.2 0 0);
-  --sidebar-ring: oklch(0.6 0.2 280);
+  --sidebar-border: oklch(0.274 0.006 286);
+  --sidebar-ring: oklch(0.696 0.17 162);
 }
 
 @theme inline {
@@ -117,58 +135,105 @@
   * {
     @apply border-border outline-ring/50;
   }
+
+  /* ============================================================
+     Chrome 插件 popup 固定窗口
+     ------------------------------------------------------------
+     Chrome 扩展 popup 的最大允许尺寸是 800x600。
+     这里采用 360x600，是 MetaMask / Phantom 等主流钱包的业界尺寸，
+     比之前的 400 更紧凑、视觉更精致，同时给字体/间距留出余地。
+     ============================================================ */
   html,
-body  {
+  body {
     @apply bg-background text-foreground;
-
-    /* --- 在这里定义您想要的插件窗口尺寸 --- */
-    width: 400px;
+    width: 360px;
     height: 600px;
-    /* ------------------------------------ */
-
-    /* (可选) 移除浏览器默认的边距，让内容更好地填充窗口 */
     margin: 0;
     padding: 0;
+    /* 桌面端基准字号收紧到 14px，比 Web 端 16px 更适合 popup */
+    font-size: 14px;
+    /* 防止 popup 出现莫名其妙的整体滚动条 */
+    overflow: hidden;
   }
 
   #__next {
-  width: 100%;
-  height: 100%;
-}
-
-  /* 触摸友好的通用样式 */
-  .touch-manipulation {
-    touch-action: manipulation;
+    width: 100%;
+    height: 100%;
   }
 
-  /* 改善卡片和按钮的触摸反馈 */
+  /* ============================================================
+     桌面键鼠交互
+     ------------------------------------------------------------
+     - 鼠标悬停时显式 cursor，所有可点击元素一致
+     - 键盘焦点环用 emerald 色，符合品牌
+     - 文本选择高亮也用 emerald
+     ============================================================ */
   [role='button'],
-  button,
+  button:not(:disabled),
+  a,
   .cursor-pointer {
-    -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
   }
 
-  /* 优化滚动性能 */
-  .overflow-y-auto,
-  .overflow-x-auto {
-    -webkit-overflow-scrolling: touch;
+  ::selection {
+    background-color: oklch(0.696 0.17 162 / 35%);
+    color: oklch(0.985 0 0);
   }
 
-  /* Added custom scrollbar styling for dark theme */
+  /* ============================================================
+     滚动条：极简款，仅在容器 hover 时显形
+     ------------------------------------------------------------
+     Chrome 插件场景下，"幽灵滚动条"比常显的更专业。
+     ============================================================ */
   ::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
 
   ::-webkit-scrollbar-track {
-    background: oklch(0.15 0 0);
+    background: transparent;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: oklch(0.3 0 0);
+    background: transparent;
     border-radius: 3px;
+    transition: background 0.2s ease;
+  }
+
+  /* 容器 hover 才显形 */
+  *:hover > ::-webkit-scrollbar-thumb,
+  *:hover::-webkit-scrollbar-thumb {
+    background: oklch(0.37 0.013 286 / 60%); /* zinc-700 半透 */
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: oklch(0.4 0 0);
+    background: oklch(0.45 0.013 286 / 80%);
+  }
+
+  /* Firefox 滚动条 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.37 0.013 286 / 60%) transparent;
+  }
+}
+
+/* ============================================================
+   工具类：插件常用的少量定制 utility
+   ============================================================ */
+@layer utilities {
+  /* 强调用渐变文字（仅用于 Logo / 品牌文字，不滥用） */
+  .text-brand-gradient {
+    background: linear-gradient(135deg, oklch(0.765 0.177 163) 0%, oklch(0.685 0.169 237) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* 卡片悬浮态（用于交互卡片） */
+  .card-interactive {
+    @apply transition-colors duration-150;
+  }
+  .card-interactive:hover {
+    background-color: oklch(0.274 0.006 286);
   }
 }
