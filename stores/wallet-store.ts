@@ -400,13 +400,18 @@ export const useWalletStore = create<WalletState>()(
           // ===== 第二步：从自己 pending tx 的 rawtx 中解析虚拟找零 UTXO =====
           // 这些 UTXO 还没在 scantxoutset 里出现（因为对应交易在内存池中尚未上链），
           // 但用户应该可以立即看到 / 立即花。
+          // 注意：必须检查 pendingPicked，因为虚拟 UTXO 自己也可能被另一笔 pending
+          // tx 花掉（比如 tx1 的找零被 tx2 当成输入），那种情况下绝不能再加回来，
+          // 否则下一轮选 UTXO 会选到一个已经被 mempool 锁定的输入，广播必然命中
+          // txn-mempool-conflict (-26)。
           const onchainKeys = new Set(unifiedUnspents.map((u) => `${u.txid}:${u.vout}`))
           for (const tx of get().pendingTransactions) {
             if (tx.status !== 'pending' || !tx.rawtx) continue
             const myOuts = extractMyOutputsFromRawtx(tx.rawtx, address, tx.id)
             for (const out of myOuts) {
               const key = `${out.txid}:${out.vout}`
-              if (onchainKeys.has(key)) continue // 已经在 scantxoutset 里了，跳过
+              if (onchainKeys.has(key)) continue // 已经在 scantxoutset 里了
+              if (pendingPicked.has(key)) continue // 自己已被另一笔 pending tx 花掉
               unifiedUnspents.push({
                 ...out,
                 isUsable: true,
@@ -496,6 +501,7 @@ export const useWalletStore = create<WalletState>()(
             for (const out of myOuts) {
               const key = `${out.txid}:${out.vout}`
               if (existingKeys.has(key)) continue
+              if (pendingPicked.has(key)) continue // 自己已被另一笔 pending tx 花掉，跳过
               filtered.push({ ...out, isUsable: true, isHasMemPool: false })
               existingKeys.add(key)
             }
