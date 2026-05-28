@@ -226,7 +226,7 @@ export function getCoinPriceApi(debounceMs: number = 300): Promise<ApiData<RpcRe
         data: {
           success: true,
           rpcData: { price },
-          nodeInfo: { endpoint: url, responseTime: Date.now() - start }
+          nodeInfo: { status: 'connected', endpoint: url, responseTime: Date.now() - start }
         }
       } as ApiData<RpcRes<{ price: number }>>
     } catch (e: any) {

@@ -178,7 +178,7 @@ export async function rpcCall<T>(method: string, params: unknown[] = [], options
       data: {
         success: true,
         rpcData: result,
-        nodeInfo: { endpoint, responseTime }
+        nodeInfo: { status: 'connected', endpoint, responseTime }
       },
       code: 200,
       message: 'OK'
