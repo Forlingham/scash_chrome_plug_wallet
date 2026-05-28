@@ -1,23 +1,43 @@
 'use client'
 
-// 钱包首页
-// 与 web 钱包 components/wallet-home.tsx 同源，差异：
-//   - 图片资源走扩展自带 /logo.png（manifest 已声明）而不是远程 R2 域。
-//   - 历史交易刷新间隔统一为 3 分钟（不再读取 process.env 测试网开关）。
-//   - 顶部的"未配置 RPC"横幅（NoRpcBanner）由 wallet-store 中 nodeInfo.status 驱动。
+// 钱包首页（Chrome 插件桌面化重塑）
+// ----------------------------------------------------------------------
+// 业务行为与之前完全一致：
+//   - 拉取地址交易（getTxs），每 3 分钟一次
+//   - 解析 DAP 留言，渲染消息卡片
+//   - 根据 unspent 推导 confirmed / pending 状态
+//   - 监听登录过期（2h 不操作自动锁仓）
+//
+// 视觉/交互的桌面化改造：
+//   - 删除"滚动驱动 header 缩放动画"（手机沉浸式设计，桌面工具栏应稳定）
+//   - 删除滚动时弹出的余额条
+//   - 余额卡片：去渐变，单一 zinc-900 卡片 + emerald 强调
+//   - 4 个动作按钮：统一中性风格，唯一 Send 用 emerald 高亮（主 CTA 语义）
+//   - 交易列表：信息密度更高，图标尺寸收紧到 28px
+//   - DAP 消息卡片：替换过重的 purple 为更内敛的 indigo
+// ----------------------------------------------------------------------
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { useLanguage } from '@/contexts/language-context'
-import { ArrowDown, ArrowUp, ArrowUpDown, Settings, Clock, X, Database, WifiOff, MessageSquare } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Settings,
+  Clock,
+  X,
+  Database,
+  WifiOff,
+  MessageSquare,
+  ExternalLink,
+} from 'lucide-react'
 import { calcValue, NAME_TOKEN, onOpenExplorer } from '@/lib/utils'
 import { PendingTransaction, Transaction, useWalletActions, useWalletState } from '@/stores/wallet-store'
 import { getAddressTxsExtApi } from '@/lib/externalApi'
 import { parseDapMessage, type DapMessage } from '@/lib/dap'
 import Decimal from 'decimal.js'
 import { getRawTransactionApi } from '@/lib/api'
-import { useToast } from '@/hooks/use-toast'
 import { DapMessageDisplay } from './dap-message-display'
 import { PriceChartCard } from './price-chart-card'
 
@@ -25,17 +45,36 @@ interface WalletHomeProps {
   onNavigate: (view: string) => void
 }
 
+// 信号强度计算结果
+interface SignalInfo {
+  bars: number
+  /** Tailwind text-color 类名，例如 "text-emerald-400" */
+  color: string
+  /** Tailwind bg-color 类名（与 color 对应），用于条状指示器 */
+  bg: string
+  label: string
+}
+
 export function WalletHome({ onNavigate }: WalletHomeProps) {
-  const { wallet, coinPrice, unspent, transactions, pendingTransactions, blockchainInfo, confirmations, isLocked, nodeInfo } =
-    useWalletState()
+  const {
+    wallet,
+    coinPrice,
+    unspent,
+    transactions,
+    pendingTransactions,
+    blockchainInfo,
+    confirmations,
+    isLocked,
+    nodeInfo,
+  } = useWalletState()
   const { addTransaction, addPendingTransaction, lockWallet, setMemPoolBalance } = useWalletActions()
   const { t } = useLanguage()
-  const { toast } = useToast()
+
   const [getAddressTxsLoading, setGetAddressTxsLoading] = useState<boolean>(false)
-  const [explorerConnectionStatus, setExplorerConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking')
+  const [explorerConnectionStatus, setExplorerConnectionStatus] =
+    useState<'connected' | 'disconnected' | 'checking'>('checking')
   const [explorerResponseTime, setExplorerResponseTime] = useState<number>(0)
   const [dapMessages, setDapMessages] = useState<Map<string, DapMessage>>(new Map())
-  const [isScrolled, setIsScrolled] = useState(false)
 
   async function getTxs() {
     if (!wallet.address) return
@@ -54,15 +93,11 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
       setExplorerConnectionStatus('connected')
 
       if (!res || !res.length) {
-        // 接口拉到了但是没数据，把内存池入账归零（这地址确实没收到内存池中的转账）
         setMemPoolBalance(0)
         return
       }
 
-      // ===== 内存池入账检测 =====
-      // 别人发我的、还没上链的（confirmations === 0 && type=income）
-      // 自己找零虽然 confirmations 也可能是 0，但 analyzeTransaction 里会归到
-      // 'self' 或 'expense'，不会是 'income'，所以这里筛得干净。
+      // 内存池入账：只计算别人转给我、还没上链的部分
       let memPoolIncoming = new Decimal(0)
       for (const tx of res) {
         if ((tx.confirmations ?? 0) === 0 && tx.type === 'income') {
@@ -71,7 +106,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
       }
       setMemPoolBalance(memPoolIncoming.toNumber())
 
-      // 解析 DAP 消息
+      // DAP 留言解析
       const newDapMessages = new Map<string, DapMessage>()
       for (const tx of res) {
         if (tx.rawTransaction) {
@@ -89,8 +124,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
         const type = ['income', 'mining'].includes(tx.type) ? 'receive' : 'send'
         let amount = 0
         if (type === 'send') {
-          amount = new Decimal(tx.netAmount).toNumber()
-          amount = amount * -1
+          amount = new Decimal(tx.netAmount).toNumber() * -1
         } else {
           amount = tx.netAmount
         }
@@ -102,7 +136,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
             address: '',
             timestamp: new Date(tx.timestamp).getTime(),
             status: unspentTx.isUsable ? 'confirmed' : 'pending',
-            height: unspentTx.height
+            height: unspentTx.height,
           }
         } else {
           txInfo = {
@@ -112,7 +146,7 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
             address: '',
             timestamp: new Date(tx.timestamp).getTime(),
             status: 'confirmed',
-            height: 0
+            height: 0,
           }
         }
         addTransaction(txInfo)
@@ -125,43 +159,63 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
     }
   }
 
-  // 区块浏览器信号强度
-  const getSignalStrength = () => {
-    if (explorerConnectionStatus === 'disconnected') {
-      return { strength: 0, color: 'text-red-500', bars: 0, label: t('node.signal.disconnected') }
+  // ===== 信号强度统一推导器（节点 / 浏览器都用） =====
+  // 从 ms 响应时间映射到 4 档信号；颜色用 emerald → amber → red 渐进，
+  // 而不是之前的红绿黄混搭，更符合金融工具的克制感。
+  function buildSignal(
+    status: 'connected' | 'disconnected' | 'checking',
+    responseTime: number,
+  ): SignalInfo {
+    if (status === 'disconnected') {
+      return {
+        bars: 0,
+        color: 'text-red-400',
+        bg: 'bg-red-400',
+        label: t('node.signal.disconnected'),
+      }
     }
-    if (explorerConnectionStatus === 'checking') {
-      return { strength: 0, color: 'text-yellow-500', bars: 0, label: t('explorer.status.checking') }
+    if (status === 'checking') {
+      return {
+        bars: 0,
+        color: 'text-amber-400',
+        bg: 'bg-amber-400',
+        label: t('explorer.status.checking'),
+      }
     }
-    if (explorerResponseTime < 500) {
-      return { strength: 3, color: 'text-green-500', bars: 3, label: `${t('node.signal.excellent')} (${explorerResponseTime}ms)` }
-    } else if (explorerResponseTime < 1500) {
-      return { strength: 2, color: 'text-green-400', bars: 2, label: `${t('node.signal.good')} (${explorerResponseTime}ms)` }
-    } else if (explorerResponseTime < 3000) {
-      return { strength: 1, color: 'text-yellow-500', bars: 1, label: `${t('node.signal.fair')} (${explorerResponseTime}ms)` }
-    } else {
-      return { strength: 1, color: 'text-orange-500', bars: 1, label: `${t('node.signal.slow')} (${explorerResponseTime}ms)` }
+    if (responseTime < 500) {
+      return {
+        bars: 3,
+        color: 'text-emerald-400',
+        bg: 'bg-emerald-400',
+        label: `${t('node.signal.excellent')} (${responseTime}ms)`,
+      }
+    }
+    if (responseTime < 1500) {
+      return {
+        bars: 2,
+        color: 'text-emerald-300',
+        bg: 'bg-emerald-300',
+        label: `${t('node.signal.good')} (${responseTime}ms)`,
+      }
+    }
+    if (responseTime < 3000) {
+      return {
+        bars: 1,
+        color: 'text-amber-400',
+        bg: 'bg-amber-400',
+        label: `${t('node.signal.fair')} (${responseTime}ms)`,
+      }
+    }
+    return {
+      bars: 1,
+      color: 'text-amber-500',
+      bg: 'bg-amber-500',
+      label: `${t('node.signal.slow')} (${responseTime}ms)`,
     }
   }
 
-  // 节点信号强度
-  const getNodeSignalStrength = () => {
-    if (nodeInfo.status === 'disconnected') {
-      return { strength: 0, color: 'text-red-500', bars: 0, label: t('node.signal.disconnected') }
-    }
-    if (nodeInfo.status === 'checking') {
-      return { strength: 0, color: 'text-yellow-500', bars: 0, label: t('node.status.checking') }
-    }
-    if (nodeInfo.responseTime < 500) {
-      return { strength: 3, color: 'text-green-500', bars: 3, label: `${t('node.signal.excellent')} (${nodeInfo.responseTime}ms)` }
-    } else if (nodeInfo.responseTime < 1500) {
-      return { strength: 2, color: 'text-green-400', bars: 2, label: `${t('node.signal.good')} (${nodeInfo.responseTime}ms)` }
-    } else if (nodeInfo.responseTime < 3000) {
-      return { strength: 1, color: 'text-yellow-500', bars: 1, label: `${t('node.signal.fair')} (${nodeInfo.responseTime}ms)` }
-    } else {
-      return { strength: 1, color: 'text-orange-500', bars: 1, label: `${t('node.signal.slow')} (${nodeInfo.responseTime}ms)` }
-    }
-  }
+  const explorerSignal = buildSignal(explorerConnectionStatus, explorerResponseTime)
+  const nodeSignal = buildSignal(nodeInfo.status, nodeInfo.responseTime)
 
   async function getRawTransaction(pendingTx: PendingTransaction) {
     try {
@@ -209,431 +263,442 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
     getPendingTxs()
     onLoginExpired()
 
-    const handleScroll = () => {
-      const container = document.getElementById('wallet-scroll-container')
-      const scrollTop = container ? container.scrollTop : 0
-      const windowScroll = window.scrollY
-      setIsScrolled(scrollTop > 50 || windowScroll > 50)
-    }
-
-    const container = document.getElementById('wallet-scroll-container')
-    if (container) container.addEventListener('scroll', handleScroll)
-    window.addEventListener('scroll', handleScroll)
-
     return () => {
-      if (container) container.removeEventListener('scroll', handleScroll)
-      window.removeEventListener('scroll', handleScroll)
       clearTimeout(txsInterval)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wallet.balance, unspent])
 
+  // ===== 余额数字渲染：整数加千分位、保留小数部分小一号 =====
+  const balanceStr = wallet.balance.toString()
+  const balanceInt = balanceStr.split('.')[0]
+  const balanceFrac = balanceStr.includes('.') ? balanceStr.split('.')[1] : ''
+
   return (
     <>
-      {/* Fixed Header */}
-      <div
-        className={`absolute top-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-md shadow-lg transition-all duration-300 ${
-          isScrolled ? 'py-2 border-transparent' : 'py-4 border-b border-purple-500/30'
-        }`}
-      >
-        <div className={`flex justify-between items-center transition-all duration-300 ${isScrolled ? 'px-3' : 'px-4'}`}>
-          <div className={`flex items-center gap-3 transition-all duration-300 ${isScrolled ? 'scale-90' : ''}`}>
-            <div className="relative">
+      {/* ============================================================
+          顶部工具栏（固定）
+          - 静态布局，无滚动动画
+          - 左：Logo + 品牌名（短版 SCASH，原 wallet.title 在 360 太长）
+          - 右：当前区块高度 + 设置入口
+          ============================================================ */}
+      <div className="absolute top-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-b border-zinc-800/60">
+        <div className="flex items-center justify-between px-3 h-12">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="relative shrink-0">
               <img
-                src="/logo.jpg"
-                alt="SCASH Logo"
-                className={`rounded-full border-2 border-purple-400/50 shadow-lg transition-all duration-300 ${
-                  isScrolled ? 'w-8 h-8' : 'w-10 h-10'
+                src="/logo.png"
+                alt="SCASH"
+                className="w-7 h-7 rounded-full ring-1 ring-zinc-700/60"
+              />
+              {/* 在线指示点 */}
+              <span
+                className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full ring-2 ring-background ${
+                  nodeInfo.status === 'connected'
+                    ? 'bg-emerald-400'
+                    : nodeInfo.status === 'checking'
+                      ? 'bg-amber-400'
+                      : 'bg-red-400'
                 }`}
               />
-              <div
-                className={`absolute -top-1 -right-1 bg-green-400 rounded-full border-2 border-gray-900 transition-all duration-300 ${
-                  isScrolled ? 'w-2.5 h-2.5' : 'w-3 h-3'
-                }`}
-              ></div>
             </div>
-            <div className={`transition-all duration-300 ${isScrolled ? 'opacity-0 hidden' : ''}`}>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                {t('wallet.title')}
-              </h1>
-              <div className="text-xs text-gray-400">{t('wallet.subtitle')}</div>
-            </div>
-            <div className={`transition-all duration-300 ${isScrolled ? 'opacity-100' : 'opacity-0 hidden'}`}>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">SCASH Wallet</h1>
+            <div className="min-w-0">
+              <h1 className="text-sm font-semibold text-zinc-100 leading-none">SCASH</h1>
+              <div className="text-[10px] text-zinc-500 mt-0.5 truncate">{t('wallet.subtitle')}</div>
             </div>
           </div>
-          <div className={`flex items-center gap-3 transition-all duration-300 ${isScrolled ? 'scale-90' : ''}`}>
-            <div
-              className={`bg-purple-500/10 border border-purple-500/20 rounded-lg transition-all duration-300 ${
-                isScrolled ? 'px-2 py-0.5' : 'px-3 py-1.5'
-              }`}
-            >
-              <div className={`text-purple-300 font-medium transition-all duration-300 ${isScrolled ? 'text-[14px]' : 'text-xs'}`}>
+
+          <div className="flex items-center gap-1.5">
+            {/* 区块高度 chip */}
+            <div className="flex flex-col items-end px-2 py-0.5 rounded-md bg-zinc-800/60">
+              <span className="text-[9px] text-zinc-500 leading-none uppercase tracking-wider">
                 {t('wallet.blockHeight')}
-              </div>
-              <div className={`text-white font-semibold transition-all duration-300 ${isScrolled ? 'text-[10px]' : 'text-sm'}`}>
-                {blockchainInfo.headers.toLocaleString()}
-              </div>
+              </span>
+              <span className="text-[11px] text-zinc-200 font-medium font-mono leading-tight mt-0.5">
+                {blockchainInfo.headers ? blockchainInfo.headers.toLocaleString() : '—'}
+              </span>
             </div>
             <Button
               variant="ghost"
-              size="sm"
-              className="text-gray-300 hover:text-white hover:bg-purple-500/20 transition-all duration-200"
+              size="icon-sm"
+              className="text-zinc-400 hover:text-zinc-100"
               onClick={() => onNavigate('settings')}
+              aria-label={t('settings.title')}
             >
-              <Settings className="h-5 w-5" />
+              <Settings className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Scrolled balance bar */}
+      {/* ============================================================
+          主滚动容器
+          ============================================================ */}
       <div
-        className={`absolute top-[55px] left-0 right-0 z-40 bg-gray-900/98 backdrop-blur-md shadow-lg transition-all duration-300 ${
-          isScrolled ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-2 pointer-events-none'
-        }`}
+        id="wallet-scroll-container"
+        className="pt-12 h-full overflow-y-auto px-3 pb-3 space-y-3"
       >
-        <div className="px-4 py-2.5">
-          <div className="grid grid-cols-3 gap-3 text-xs">
-            <div className="bg-green-500/5 rounded-lg p-2 text-center">
-              <div className="text-green-400/80 font-medium text-[10px] uppercase tracking-wide">{t('wallet.available')}</div>
-              <div className="text-white font-semibold text-sm mt-0.5">{wallet.usableBalance}</div>
-            </div>
-            <div className="bg-orange-500/5 rounded-lg p-2 text-center">
-              <div className="text-orange-400/80 font-medium text-[10px] uppercase tracking-wide">{t('wallet.locked')}</div>
-              <div className="text-white font-semibold text-sm mt-0.5">{wallet.lockBalance}</div>
-            </div>
-            <div className="bg-blue-500/5 rounded-lg p-2 text-center">
-              <div className="text-blue-400/80 font-medium text-[10px] uppercase tracking-wide">{t('wallet.memPool')}</div>
-              <div className="text-white font-semibold text-sm mt-0.5">{wallet.memPoolBalance}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main */}
-      <div className={`pt-20 flex-1 p-4 space-y-4 overflow-y-auto transition-all duration-300 ${isScrolled ? 'mt-0' : 'mt-10'}`}>
-        <Card className="relative bg-gradient-to-br from-purple-900/20 via-gray-800 to-purple-800/30 border-purple-500/30 backdrop-blur-sm overflow-hidden">
-          {/* 节点连接状态栏 */}
-          <div className="absolute top-3 left-6 z-20 flex items-center gap-2">
-            <div className="relative group">
-              {nodeInfo.status === 'disconnected' && <WifiOff className="h-3.5 w-3.5 text-red-500" />}
+        {/* ========== 余额卡片 ========== */}
+        <div className="relative rounded-lg border border-zinc-800/80 bg-gradient-to-b from-zinc-900 to-zinc-950 overflow-hidden">
+          {/* 节点状态条（顶部内联） */}
+          <div className="flex items-center justify-between px-3 pt-2.5 pb-2 border-b border-zinc-800/60">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {nodeInfo.status === 'disconnected' && (
+                <WifiOff className="h-3 w-3 text-red-400 shrink-0" />
+              )}
               {nodeInfo.status === 'checking' && (
-                <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-yellow-500/30 border-t-yellow-500"></div>
+                <span className="h-3 w-3 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin shrink-0" />
               )}
               {nodeInfo.status === 'connected' && (
-                <div className="flex items-end gap-0.5">
+                <span className="flex items-end gap-px shrink-0">
                   {[1, 2, 3].map((bar) => (
-                    <div
+                    <span
                       key={bar}
-                      className={`w-1 rounded-sm transition-all ${
-                        bar <= getNodeSignalStrength().bars ? getNodeSignalStrength().color.replace('text-', 'bg-') : 'bg-gray-600'
+                      className={`w-0.5 rounded-sm ${
+                        bar <= nodeSignal.bars ? nodeSignal.bg : 'bg-zinc-700'
                       }`}
-                      style={{ height: `${bar * 3.5}px` }}
+                      style={{ height: `${bar * 3}px` }}
                     />
                   ))}
-                </div>
-              )}
-            </div>
-
-            {nodeInfo.status === 'disconnected' && (
-              <span
-                className="text-xs text-red-400 cursor-pointer underline-offset-2 hover:underline"
-                onClick={() => onNavigate('settings')}
-              >
-                {t('node.status.disconnected')}
-              </span>
-            )}
-            {nodeInfo.status === 'checking' && <span className="text-xs text-yellow-400">{t('node.status.checking')}</span>}
-            {nodeInfo.status === 'connected' && (
-              <span className="text-xs text-gray-400 truncate max-w-[180px]">
-                {t('node.status.connected')}: <span className={getNodeSignalStrength().color}>{getNodeSignalStrength().label}</span>
-              </span>
-            )}
-          </div>
-
-          {/* logo 背景 */}
-          <div className="absolute top-0 right-0 w-20 h-20 opacity-10">
-            <img src="/logo.png" alt="Coin Logo" className="w-full h-full object-contain filter brightness-150" />
-          </div>
-
-          <CardContent className="px-6 py-5 relative z-10">
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3 text-xs">
-                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-2 text-center">
-                  <div className="text-green-400 font-medium">{t('wallet.available')}</div>
-                  <div className="text-white font-semibold">{wallet.usableBalance}</div>
-                </div>
-                <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-2 text-center">
-                  <div className="text-orange-400 font-medium">{t('wallet.locked')}</div>
-                  <div className="text-white font-semibold">{wallet.lockBalance}</div>
-                </div>
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-2 text-center">
-                  <div className="text-blue-400 font-medium">{t('wallet.memPool')}</div>
-                  <div className="text-white font-semibold">{wallet.memPoolBalance}</div>
-                </div>
-              </div>
-
-              <div className="text-center space-y-2">
-                <div className="relative text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent flex items-end justify-center gap-2">
-                  <span>
-                    {wallet.balance.toString().split('.')[0] && Number(wallet.balance.toString().split('.')[0]).toLocaleString()}
-                    {wallet.balance.toString().includes('.') && (
-                      <span className="text-2xl">.{wallet.balance.toString().split('.')[1]}</span>
-                    )}
-                    <span className="absolute bottom-0 text-sm text-gray-400 font-normal">{NAME_TOKEN}</span>
-                  </span>
-                </div>
-                <div className="text-xl text-gray-300 font-medium">${calcValue(wallet.balance, coinPrice)} USD</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 操作入口（4 个按钮） */}
-        <div className="grid grid-cols-4 gap-2">
-          <button
-            className="group flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-orange-500/10 to-red-600/5 border border-orange-500/30 hover:border-orange-400/60 hover:from-orange-500/20 hover:to-red-600/10 transition-all duration-300 active:scale-95"
-            onClick={() => onNavigate('trade')}
-          >
-            <div className="relative mb-2">
-              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <ArrowUpDown className="h-5 w-5 text-orange-400" />
-              </div>
-            </div>
-            <span className="text-xs text-orange-400/80 font-medium">{t('action.trade')}</span>
-          </button>
-
-          <button
-            className="group flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-600/5 border border-purple-500/30 hover:border-purple-400/60 hover:from-purple-500/20 hover:to-pink-600/10 transition-all duration-300 active:scale-95"
-            onClick={() => onNavigate('engrave')}
-          >
-            <div className="relative mb-2">
-              <div className="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <MessageSquare className="h-5 w-5 text-purple-400" />
-              </div>
-            </div>
-            <span className="text-xs text-purple-400/80 font-medium">{t('action.engrave')}</span>
-          </button>
-
-          <button
-            className="group flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/30 hover:border-green-400/60 hover:from-green-500/20 hover:to-green-600/10 transition-all duration-300 active:scale-95"
-            onClick={() => onNavigate('receive')}
-          >
-            <div className="relative mb-2">
-              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <ArrowDown className="h-5 w-5 text-green-400" />
-              </div>
-            </div>
-            <span className="text-xs text-green-400/80 font-medium">{t('action.receive')}</span>
-          </button>
-
-          <button
-            className="group flex flex-col items-center justify-center p-3 rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-600/5 border border-blue-500/30 hover:border-blue-400/60 hover:from-blue-500/20 hover:to-cyan-600/10 transition-all duration-300 active:scale-95"
-            onClick={() => onNavigate('send')}
-          >
-            <div className="relative mb-2">
-              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                <ArrowUp className="h-5 w-5 text-blue-400" />
-              </div>
-            </div>
-            <span className="text-xs text-blue-400/80 font-medium">{t('action.send')}</span>
-          </button>
-        </div>
-
-        {/* 币价走势 */}
-        <PriceChartCard />
-
-        {/* Recent Transactions */}
-        <Card className="bg-gray-800 border-gray-700 pt-0">
-          <CardContent className="px-4">
-            {/* 区块浏览器连接状态 */}
-            <div className="flex items-center gap-2 pt-3 pb-2">
-              <div className="relative group">
-                {explorerConnectionStatus === 'disconnected' && <WifiOff className="h-3.5 w-3.5 text-red-500" />}
-                {explorerConnectionStatus === 'checking' && (
-                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-yellow-500/30 border-t-yellow-500"></div>
-                )}
-                {explorerConnectionStatus === 'connected' && (
-                  <div className="flex items-end gap-0.5">
-                    {[1, 2, 3].map((bar) => (
-                      <div
-                        key={bar}
-                        className={`w-1 rounded-sm transition-all ${
-                          bar <= getSignalStrength().bars ? getSignalStrength().color.replace('text-', 'bg-') : 'bg-gray-600'
-                        }`}
-                        style={{ height: `${bar * 3.5}px` }}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {explorerConnectionStatus === 'disconnected' && (
-                <span className="text-xs text-red-400">{t('explorer.status.disconnected')}</span>
-              )}
-              {explorerConnectionStatus === 'checking' && <span className="text-xs text-yellow-400">{t('explorer.status.checking')}</span>}
-              {explorerConnectionStatus === 'connected' && (
-                <span className="text-xs text-gray-400">
-                  {t('explorer.status.connected')}: <span className={getSignalStrength().color}>{getSignalStrength().label}</span>
                 </span>
               )}
+              {nodeInfo.status === 'disconnected' ? (
+                <button
+                  className="text-[10px] text-red-400 hover:underline"
+                  onClick={() => onNavigate('settings')}
+                >
+                  {t('node.status.disconnected')}
+                </button>
+              ) : nodeInfo.status === 'checking' ? (
+                <span className="text-[10px] text-amber-400">{t('node.status.checking')}</span>
+              ) : (
+                <span className={`text-[10px] truncate ${nodeSignal.color}`}>{nodeSignal.label}</span>
+              )}
             </div>
+          </div>
 
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-medium">{t('transactions.recent')}</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-green-400 hover:text-green-300"
-                onClick={() => onOpenExplorer('2', 'address', wallet.address)}
-              >
-                {t('transactions.openExplorer')}
-              </Button>
+          {/* 主余额数字 */}
+          <div className="px-4 pt-4 pb-3 text-center">
+            <div className="text-2xl font-semibold text-zinc-50 tracking-tight tabular-nums leading-none">
+              {balanceInt && Number(balanceInt).toLocaleString()}
+              {balanceFrac && (
+                <span className="text-base text-zinc-400">.{balanceFrac}</span>
+              )}
+              <span className="ml-1.5 text-xs text-zinc-500 font-normal align-baseline">
+                {NAME_TOKEN}
+              </span>
             </div>
+            <div className="mt-1.5 text-xs text-zinc-500 tabular-nums">
+              ≈ ${calcValue(wallet.balance, coinPrice)} USD
+            </div>
+          </div>
 
-            <div className="space-y-3">
-              {pendingTransactions.map((tx) => (
-                <div key={tx.id}>
-                  {tx.status === 'pending' && (
-                    <div className=" p-3 bg-gray-900 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-orange-500">
-                            <Database className="h-4 w-4 text-white" />
-                          </div>
-                          <div>
-                            <p className="text-white font-medium">
-                              {t('transactions.sent')} {NAME_TOKEN}
-                            </p>
-                            {tx.id && (
-                              <p className="text-gray-400 text-sm">
-                                {tx.id.slice(0, 6)}····{tx.id.slice(-6)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-red-400">- {tx.totalOutput}</p>
-                          <p className="text-gray-400 text-sm">${calcValue(tx.totalOutput, coinPrice)} USD</p>
-                        </div>
+          {/* 三联余额细分 */}
+          <div className="grid grid-cols-3 gap-px bg-zinc-800/60 border-t border-zinc-800/60">
+            <div className="px-2 py-2 text-center bg-zinc-900">
+              <div className="text-[9px] text-emerald-400/80 font-medium uppercase tracking-wider">
+                {t('wallet.available')}
+              </div>
+              <div className="text-xs text-zinc-100 font-medium font-mono mt-0.5 tabular-nums">
+                {wallet.usableBalance}
+              </div>
+            </div>
+            <div className="px-2 py-2 text-center bg-zinc-900">
+              <div className="text-[9px] text-amber-400/80 font-medium uppercase tracking-wider">
+                {t('wallet.locked')}
+              </div>
+              <div className="text-xs text-zinc-100 font-medium font-mono mt-0.5 tabular-nums">
+                {wallet.lockBalance}
+              </div>
+            </div>
+            <div className="px-2 py-2 text-center bg-zinc-900">
+              <div className="text-[9px] text-sky-400/80 font-medium uppercase tracking-wider">
+                {t('wallet.memPool')}
+              </div>
+              <div className="text-xs text-zinc-100 font-medium font-mono mt-0.5 tabular-nums">
+                {wallet.memPoolBalance}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ========== 4 个操作按钮 ==========
+            视觉策略：
+            - 不再 4 种渐变背景，统一 zinc-900 卡片 + zinc-800/60 边框
+            - 唯一 "Send" 用 emerald 强调（主 CTA 语义）
+            - hover 时整卡背景从 zinc-900 → zinc-800
+            - 去掉 active:scale-95（手机点按反馈，桌面用 hover 反馈替代）
+        */}
+        <div className="grid grid-cols-4 gap-2">
+          <ActionButton
+            icon={<ArrowUp className="h-4 w-4" />}
+            label={t('action.send')}
+            onClick={() => onNavigate('send')}
+            primary
+          />
+          <ActionButton
+            icon={<ArrowDown className="h-4 w-4" />}
+            label={t('action.receive')}
+            onClick={() => onNavigate('receive')}
+          />
+          <ActionButton
+            icon={<MessageSquare className="h-4 w-4" />}
+            label={t('action.engrave')}
+            onClick={() => onNavigate('engrave')}
+          />
+          <ActionButton
+            icon={<ArrowUpDown className="h-4 w-4" />}
+            label={t('action.trade')}
+            onClick={() => onNavigate('trade')}
+          />
+        </div>
+
+        {/* ========== 币价走势 ========== */}
+        <PriceChartCard />
+
+        {/* ========== 交易记录 ========== */}
+        <div className="rounded-lg border border-zinc-800/80 bg-zinc-900">
+          {/* 区块浏览器状态 + 标题 + 在浏览器查看 */}
+          <div className="flex items-center justify-between px-3 pt-2.5 pb-2 border-b border-zinc-800/60">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {explorerConnectionStatus === 'disconnected' && (
+                <WifiOff className="h-3 w-3 text-red-400 shrink-0" />
+              )}
+              {explorerConnectionStatus === 'checking' && (
+                <span className="h-3 w-3 rounded-full border-2 border-amber-400/30 border-t-amber-400 animate-spin shrink-0" />
+              )}
+              {explorerConnectionStatus === 'connected' && (
+                <span className="flex items-end gap-px shrink-0">
+                  {[1, 2, 3].map((bar) => (
+                    <span
+                      key={bar}
+                      className={`w-0.5 rounded-sm ${
+                        bar <= explorerSignal.bars ? explorerSignal.bg : 'bg-zinc-700'
+                      }`}
+                      style={{ height: `${bar * 3}px` }}
+                    />
+                  ))}
+                </span>
+              )}
+              <span className="text-[10px] font-medium text-zinc-300">
+                {t('transactions.recent')}
+              </span>
+              <span className={`text-[10px] truncate ${explorerSignal.color}`}>
+                · {explorerSignal.label}
+              </span>
+            </div>
+            <button
+              onClick={() => onOpenExplorer('2', 'address', wallet.address)}
+              className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors shrink-0"
+            >
+              {t('transactions.openExplorer')}
+              <ExternalLink className="h-2.5 w-2.5" />
+            </button>
+          </div>
+
+          {/* 列表本体 */}
+          <div className="divide-y divide-zinc-800/50">
+            {/* 待广播交易（自己发出但还在 mempool） */}
+            {pendingTransactions
+              .filter((tx) => tx.status === 'pending')
+              .map((tx) => (
+                <div key={tx.id} className="px-3 py-2.5 hover:bg-zinc-800/40 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center bg-amber-500/15 ring-1 ring-amber-500/30 shrink-0">
+                        <Database className="h-3.5 w-3.5 text-amber-400" />
                       </div>
-                      <div className="flex items-center justify-between border-t border-gray-700 mt-2">
-                        <div>
-                          <span className="text-gray-400 text-sm">{new Date(tx.timestamp).toLocaleString()}</span>
-                          {tx.status === 'pending' && <span className="text-orange-500 text-xs ml-5">{t('transactions.memPool')}</span>}
-                        </div>
-                        <div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-green-400 hover:text-green-300"
-                            onClick={() => onOpenExplorer('1', 'tx', tx.id)}
-                          >
-                            {t('transactions.particulars')}
-                          </Button>
-                        </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-zinc-100 font-medium leading-tight">
+                          {t('transactions.sent')} {NAME_TOKEN}
+                        </p>
+                        {tx.id && (
+                          <p className="text-[10px] text-zinc-500 font-mono truncate mt-0.5">
+                            {tx.id.slice(0, 8)}…{tx.id.slice(-6)}
+                          </p>
+                        )}
                       </div>
                     </div>
-                  )}
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-medium text-red-400 tabular-nums">−{tx.totalOutput}</p>
+                      <p className="text-[10px] text-zinc-500 tabular-nums">
+                        ${calcValue(tx.totalOutput, coinPrice)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-zinc-800/50">
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-500 min-w-0">
+                      <span className="truncate">{new Date(tx.timestamp).toLocaleString()}</span>
+                      <span className="text-amber-400 shrink-0">· {t('transactions.memPool')}</span>
+                    </div>
+                    <button
+                      onClick={() => onOpenExplorer('1', 'tx', tx.id)}
+                      className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0"
+                    >
+                      {t('transactions.particulars')}
+                    </button>
+                  </div>
                 </div>
               ))}
 
-              {transactions.map((tx) => {
-                const dapMessage = dapMessages.get(tx.id)
-                return (
-                  <div key={tx.id} className=" p-3 bg-gray-900 rounded-lg hover:bg-gray-800 cursor-pointer transition-colors">
-                    <div className="flex items-center justify-between ">
-                      <div className="flex items-center gap-3">
-                        {tx.status === 'pending' && (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-orange-500">
-                            <Clock className="h-4 w-4 text-white" />
-                          </div>
-                        )}
-                        {tx.status === 'confirmed' && (
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              tx.type === 'receive' ? 'bg-green-500' : 'bg-red-500'
-                            }`}
-                          >
-                            {tx.type === 'receive' ? (
-                              <ArrowDown className="h-4 w-4 text-white" />
-                            ) : (
-                              <ArrowUp className="h-4 w-4 text-white" />
-                            )}
-                          </div>
-                        )}
-                        {tx.status === 'failed' && (
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-500">
-                            <X className="h-4 w-4 text-white" />
-                          </div>
-                        )}
+            {/* 已确认/历史交易 */}
+            {transactions.map((tx) => {
+              const dapMessage = dapMessages.get(tx.id)
+              const isReceive = tx.type === 'receive'
+              const isPending = tx.status === 'pending'
+              const isFailed = tx.status === 'failed'
 
-                        <div>
-                          <p className="text-white font-medium">
-                            {tx.type === 'receive' ? t('transactions.received') : t('transactions.sent')} {NAME_TOKEN}
-                          </p>
-                          <p className="text-gray-400 text-sm">
-                            {tx.id.slice(0, 6)}····{tx.id.slice(-6)}
-                          </p>
+              return (
+                <div key={tx.id} className="px-3 py-2.5 hover:bg-zinc-800/40 transition-colors">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* 状态图标 */}
+                      {isPending && (
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center bg-amber-500/15 ring-1 ring-amber-500/30 shrink-0">
+                          <Clock className="h-3.5 w-3.5 text-amber-400" />
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-medium ${tx.type === 'receive' ? 'text-green-400' : 'text-red-400'}`}>
-                          {tx.amount > 0 ? '+' + tx.amount : tx.amount}
+                      )}
+                      {!isPending && !isFailed && (
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ring-1 ${
+                            isReceive
+                              ? 'bg-emerald-500/15 ring-emerald-500/30'
+                              : 'bg-red-500/15 ring-red-500/30'
+                          }`}
+                        >
+                          {isReceive ? (
+                            <ArrowDown className="h-3.5 w-3.5 text-emerald-400" />
+                          ) : (
+                            <ArrowUp className="h-3.5 w-3.5 text-red-400" />
+                          )}
+                        </div>
+                      )}
+                      {isFailed && (
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center bg-zinc-700/40 ring-1 ring-zinc-600/40 shrink-0">
+                          <X className="h-3.5 w-3.5 text-zinc-400" />
+                        </div>
+                      )}
+
+                      <div className="min-w-0">
+                        <p className="text-xs text-zinc-100 font-medium leading-tight">
+                          {isReceive ? t('transactions.received') : t('transactions.sent')} {NAME_TOKEN}
                         </p>
-                        <p className="text-gray-400 text-sm">${calcValue(tx.amount, coinPrice)} USD</p>
+                        <p className="text-[10px] text-zinc-500 font-mono truncate mt-0.5">
+                          {tx.id.slice(0, 8)}…{tx.id.slice(-6)}
+                        </p>
                       </div>
                     </div>
-
-                    {/* DAP 消息 */}
-                    {dapMessage && (
-                      <div className="mt-3 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                        <div className="flex items-start gap-2">
-                          <MessageSquare className="h-4 w-4 text-purple-400 mt-0.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-purple-300 text-xs font-medium mb-1">
-                              {dapMessage.isFromSelf
-                                ? dapMessage.isPureMessage
-                                  ? t('dap.myNote')
-                                  : t('dap.transferNote')
-                                : dapMessage.isPureMessage
-                                  ? t('dap.receivedNote')
-                                  : t('dap.senderNote')}
-                            </p>
-                          </div>
-                        </div>
-                        <DapMessageDisplay content={dapMessage.content} />
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between border-t border-gray-700 mt-3">
-                      <div>
-                        <span className="text-gray-400 text-sm">{new Date(tx.timestamp).toLocaleString()}</span>
-                        {tx.status === 'pending' && (
-                          <span className="text-orange-500 text-xs ml-5 whitespace-nowrap">
-                            {t('transactions.confirmations')}: {confirmations} / {blockchainInfo.headers - tx.height}
-                          </span>
-                        )}
-                      </div>
-                      <div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-green-400 hover:text-green-300"
-                          onClick={() => onOpenExplorer('2', 'tx', tx.id)}
-                        >
-                          {t('transactions.particulars')}
-                        </Button>
-                      </div>
+                    <div className="text-right shrink-0">
+                      <p
+                        className={`text-xs font-medium tabular-nums ${
+                          isReceive ? 'text-emerald-400' : 'text-red-400'
+                        }`}
+                      >
+                        {tx.amount > 0 ? '+' : ''}
+                        {tx.amount}
+                      </p>
+                      <p className="text-[10px] text-zinc-500 tabular-nums">
+                        ${calcValue(tx.amount, coinPrice)}
+                      </p>
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
+
+                  {/* DAP 消息：换为 indigo 系，比 purple 更内敛 */}
+                  {dapMessage && (
+                    <div className="mt-2 p-2 rounded-md bg-indigo-500/10 border border-indigo-500/25">
+                      <div className="flex items-start gap-1.5 mb-1">
+                        <MessageSquare className="h-3 w-3 text-indigo-300 mt-0.5 shrink-0" />
+                        <p className="text-[10px] text-indigo-200 font-medium leading-tight">
+                          {dapMessage.isFromSelf
+                            ? dapMessage.isPureMessage
+                              ? t('dap.myNote')
+                              : t('dap.transferNote')
+                            : dapMessage.isPureMessage
+                              ? t('dap.receivedNote')
+                              : t('dap.senderNote')}
+                        </p>
+                      </div>
+                      <DapMessageDisplay content={dapMessage.content} />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between mt-1.5 pt-1.5 border-t border-zinc-800/50">
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-500 min-w-0">
+                      <span className="truncate">{new Date(tx.timestamp).toLocaleString()}</span>
+                      {isPending && (
+                        <span className="text-amber-400 shrink-0 whitespace-nowrap">
+                          · {t('transactions.confirmations')} {confirmations}/
+                          {blockchainInfo.headers - tx.height}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => onOpenExplorer('2', 'tx', tx.id)}
+                      className="text-[10px] text-emerald-400 hover:text-emerald-300 shrink-0"
+                    >
+                      {t('transactions.particulars')}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* 空状态 */}
+            {transactions.length === 0 &&
+              pendingTransactions.filter((tx) => tx.status === 'pending').length === 0 && (
+                <div className="px-3 py-8 text-center">
+                  <p className="text-xs text-zinc-500">—</p>
+                </div>
+              )}
+          </div>
+        </div>
       </div>
     </>
+  )
+}
+
+// ============================================================
+// 内部组件：动作按钮（首页四方格之一）
+// ------------------------------------------------------------
+// primary=true 时使用 emerald 主色调（仅 Send 按钮使用），
+// 其余按钮走中性 zinc，避免 4 色彩虹混搭。
+// ============================================================
+function ActionButton({
+  icon,
+  label,
+  onClick,
+  primary = false,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  primary?: boolean
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+        primary
+          ? 'bg-emerald-500/10 border-emerald-500/40 hover:bg-emerald-500/15 hover:border-emerald-500/60'
+          : 'bg-zinc-900 border-zinc-800/80 hover:bg-zinc-800 hover:border-zinc-700'
+      }`}
+    >
+      <span
+        className={`flex items-center justify-center w-7 h-7 rounded-full transition-colors ${
+          primary
+            ? 'bg-emerald-500/20 text-emerald-300 group-hover:bg-emerald-500/30'
+            : 'bg-zinc-800 text-zinc-300 group-hover:bg-zinc-700 group-hover:text-zinc-100'
+        }`}
+      >
+        {icon}
+      </span>
+      <span
+        className={`text-[10px] font-medium tracking-wide ${
+          primary ? 'text-emerald-300' : 'text-zinc-400 group-hover:text-zinc-200'
+        }`}
+      >
+        {label}
+      </span>
+    </button>
   )
 }
