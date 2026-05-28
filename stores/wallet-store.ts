@@ -6,7 +6,7 @@
 //   - 新增 nodeInfo 字段，由 RPC 调用回填，用于驱动 wallet-home 上的"当前节点 / 信号强度"UI。
 // =============================================================================
 
-import { BlockchainInfo, getBaseFeeApi, getBlockchainInfoApi, getCoinPriceApi, getScantxoutsetApi, Unspent } from '@/lib/api'
+import { BlockchainInfo, CoinPriceData, getBaseFeeApi, getBlockchainInfoApi, getCoinPriceApi, getScantxoutsetApi, Unspent } from '@/lib/api'
 import { decryptWallet } from '@/lib/utils'
 import Decimal from 'decimal.js'
 import { create } from 'zustand'
@@ -67,6 +67,8 @@ interface WalletState {
   error: string | null
   isLocked: boolean
   coinPrice: string
+  // 富币价信息（含 24h/7d/30d 涨跌幅 + 走势数据）。运行时拉取，不持久化。
+  coinPriceInfo: CoinPriceData
   confirmations: number
   baseFee: number
 
@@ -135,6 +137,14 @@ export const useWalletStore = create<WalletState>()(
       error: null,
       isLocked: false,
       coinPrice: '0',
+      coinPriceInfo: {
+        price: 0,
+        change24h: 0,
+        changePercent24h: 0,
+        changePercent7d: 0,
+        changePercent30d: 0,
+        priceChart: []
+      },
       confirmations: 1,
       baseFee: 0,
 
@@ -407,10 +417,11 @@ export const useWalletStore = create<WalletState>()(
         try {
           const res = await getCoinPriceApi()
           if (res.data.success) {
-            const price = res.data.rpcData.price
+            const info = res.data.rpcData
             set((state) => {
-              state.coinPrice = String(price ?? 0)
-              state.blockchainInfo.coinPrice = String(price ?? 0)
+              state.coinPriceInfo = info
+              state.coinPrice = String(info.price ?? 0)
+              state.blockchainInfo.coinPrice = String(info.price ?? 0)
             })
           }
         } catch (error) {
@@ -470,6 +481,7 @@ export const useWalletState = () => {
   const pendingTransactions = useWalletStore((state) => state.pendingTransactions)
   const confirmations = useWalletStore((state) => state.confirmations)
   const coinPrice = useWalletStore((state) => state.coinPrice)
+  const coinPriceInfo = useWalletStore((state) => state.coinPriceInfo)
   const isInitialized = useWalletStore((state) => state.isInitialized)
   const isLoading = useWalletStore((state) => state.isLoading)
   const error = useWalletStore((state) => state.error)
@@ -485,6 +497,7 @@ export const useWalletState = () => {
     pendingTransactions,
     confirmations,
     coinPrice,
+    coinPriceInfo,
     isInitialized,
     isLoading,
     error,

@@ -177,34 +177,84 @@ export function onBroadcastApi(
 // 币价（直连 Explorer 公共接口，避免走任何后端）
 //
 // 默认地址：https://explorer.scash.network/api/explorer/home/overview
-// 期望返回中包含 USD 价格字段。我们对返回结构做了宽松解析：兼容
-//   - { price: number }
-//   - { coinPrice: number }
-//   - { data: { price: number } }
-//   - { usd: number }
-// 任何一种命中即可。
+//
+// 返回结构（仅列出我们关心的字段）：
+//   {
+//     price: {
+//       price: "0.047606",
+//       change24h: "-0.00014521",
+//       changePercent24h: "-0.304097...",
+//       changePercent7d: "...",
+//       changePercent30d: "..."
+//     },
+//     priceChart: [
+//       { timestamp: "...", price: "0.053351" },
+//       ...
+//     ]
+//   }
+//
+// 解析时同时兼容老结构（{ price: number }），保证用户改成自定义币价 URL
+// 时也能 fallback。
 // =============================================================================
-function pickPrice(payload: any): number {
-  if (!payload || typeof payload !== 'object') return 0
-  const candidates = [
-    payload.price,
-    payload.coinPrice,
-    payload.usd,
-    payload?.data?.price,
-    payload?.data?.coinPrice,
-    payload?.data?.usd
-  ]
-  for (const v of candidates) {
-    const num = Number(v)
-    if (Number.isFinite(num) && num > 0) return num
-  }
-  return 0
+
+export interface PricePoint {
+  timestamp: string
+  price: string
 }
 
-export function getCoinPriceApi(debounceMs: number = 300): Promise<ApiData<RpcRes<{ price: number }>>> {
+export interface CoinPriceData {
+  price: number
+  change24h: number
+  changePercent24h: number
+  changePercent7d: number
+  changePercent30d: number
+  priceChart: PricePoint[]
+}
+
+function parseNumber(v: any, fallback: number = 0): number {
+  if (v === null || v === undefined || v === '') return fallback
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function extractCoinPriceData(payload: any): CoinPriceData {
+  // 新格式：payload.price 是对象，含嵌套 .price 字段
+  // 老格式（兼容）：payload.price 直接是数字 / payload.coinPrice / payload.usd
+  const priceObj = payload?.price
+  let price = 0
+  if (priceObj && typeof priceObj === 'object') {
+    price = parseNumber(priceObj.price)
+  } else {
+    price = parseNumber(priceObj ?? payload?.coinPrice ?? payload?.usd ?? payload?.data?.price)
+  }
+
+  const change24h = priceObj && typeof priceObj === 'object' ? parseNumber(priceObj.change24h) : 0
+  const changePercent24h = priceObj && typeof priceObj === 'object' ? parseNumber(priceObj.changePercent24h) : 0
+  const changePercent7d = priceObj && typeof priceObj === 'object' ? parseNumber(priceObj.changePercent7d) : 0
+  const changePercent30d = priceObj && typeof priceObj === 'object' ? parseNumber(priceObj.changePercent30d) : 0
+
+  const rawChart = payload?.priceChart
+  const priceChart: PricePoint[] = Array.isArray(rawChart)
+    ? rawChart
+        .filter((p: any) => p && p.timestamp && p.price !== undefined && p.price !== null)
+        .map((p: any) => ({ timestamp: String(p.timestamp), price: String(p.price) }))
+    : []
+
+  return { price, change24h, changePercent24h, changePercent7d, changePercent30d, priceChart }
+}
+
+export function getCoinPriceApi(debounceMs: number = 300): Promise<ApiData<RpcRes<CoinPriceData>>> {
   return debounceCall('coinPrice', debounceMs, async () => {
     const url = getCoinPriceUrl()
     const start = Date.now()
+    const empty: CoinPriceData = {
+      price: 0,
+      change24h: 0,
+      changePercent24h: 0,
+      changePercent7d: 0,
+      changePercent30d: 0,
+      priceChart: []
+    }
     try {
       const res = await fetch(url, { method: 'GET', cache: 'no-store' })
       if (!res.ok) {
@@ -213,32 +263,32 @@ export function getCoinPriceApi(debounceMs: number = 300): Promise<ApiData<RpcRe
           message: `获取币价失败：HTTP ${res.status}`,
           data: {
             success: false,
-            rpcData: { price: 0 },
+            rpcData: empty,
             error: { error: { code: res.status, message: `HTTP ${res.status}` } }
           }
-        } as ApiData<RpcRes<{ price: number }>>
+        } as ApiData<RpcRes<CoinPriceData>>
       }
       const json = await res.json()
-      const price = pickPrice(json)
+      const parsed = extractCoinPriceData(json)
       return {
         code: 200,
         message: 'OK',
         data: {
           success: true,
-          rpcData: { price },
+          rpcData: parsed,
           nodeInfo: { status: 'connected', endpoint: url, responseTime: Date.now() - start }
         }
-      } as ApiData<RpcRes<{ price: number }>>
+      } as ApiData<RpcRes<CoinPriceData>>
     } catch (e: any) {
       return {
         code: 500,
         message: e?.message ?? '获取币价失败',
         data: {
           success: false,
-          rpcData: { price: 0 },
+          rpcData: empty,
           error: { error: { code: 500, message: e?.message ?? '获取币价失败' } }
         }
-      } as ApiData<RpcRes<{ price: number }>>
+      } as ApiData<RpcRes<CoinPriceData>>
     }
   })
 }

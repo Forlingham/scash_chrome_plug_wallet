@@ -332,6 +332,13 @@ const translations = {
     'rpc.securityNote': 'Credentials are stored in plain text in your browser localStorage. Do not use untrusted machines.',
     'rpc.securityFooter': 'Credentials live only in this extension and are sent only to the node URLs you configure.',
 
+    // 币价走势卡片
+    'wallet.priceChart': 'Price Chart',
+    'wallet.noPriceData': 'No price data available',
+    'wallet.price.period.24h': '24h',
+    'wallet.price.period.7d': '7d',
+    'wallet.price.period.30d': '30d',
+
     'safety.instructions': `
     <section>
   <h2>Wallet Security and Signing Statement</h2>
@@ -723,6 +730,13 @@ const translations = {
     'rpc.securityNote': '提示：凭据以明文形式保存在浏览器 localStorage 中，请勿在他人/共享设备上使用。',
     'rpc.securityFooter': '凭据仅保存在此扩展，且只会发送到您配置的 RPC URL。',
 
+    // 币价走势卡片
+    'wallet.priceChart': '币价走势',
+    'wallet.noPriceData': '暂无币价数据',
+    'wallet.price.period.24h': '24小时',
+    'wallet.price.period.7d': '7天',
+    'wallet.price.period.30d': '30天',
+
     'safety.instructions': `
     <section>
   <h2 className="text-white font-medium mb-2">钱包安全与签名说明</h2>
@@ -1105,6 +1119,13 @@ const translations = {
     'rpc.status': 'Статус',
     'rpc.securityNote': 'Учётные данные хранятся в localStorage в открытом виде. Не используйте на чужих устройствах.',
     'rpc.securityFooter': 'Учётные данные хранятся только в расширении и отправляются только на настроенные вами URL.',
+
+    // Карточка графика цены
+    'wallet.priceChart': 'График цены',
+    'wallet.noPriceData': 'Данные о цене недоступны',
+    'wallet.price.period.24h': '24ч',
+    'wallet.price.period.7d': '7д',
+    'wallet.price.period.30d': '30д',
 
     'safety.instructions': `
     <section>

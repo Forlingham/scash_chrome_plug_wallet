@@ -19,6 +19,7 @@ import Decimal from 'decimal.js'
 import { getRawTransactionApi } from '@/lib/api'
 import { useToast } from '@/hooks/use-toast'
 import { DapMessageDisplay } from './dap-message-display'
+import { PriceChartCard } from './price-chart-card'
 
 interface WalletHomeProps {
   onNavigate: (view: string) => void
@@ -423,6 +424,9 @@ export function WalletHome({ onNavigate }: WalletHomeProps) {
             <span className="text-xs text-blue-400/80 font-medium">{t('action.send')}</span>
           </button>
         </div>
+
+        {/* 币价走势 */}
+        <PriceChartCard />
 
         {/* Recent Transactions */}
         <Card className="bg-gray-800 border-gray-700 pt-0">
