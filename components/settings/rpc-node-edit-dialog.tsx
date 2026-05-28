@@ -44,11 +44,11 @@ async function ensurePermission(rawUrl: string): Promise<boolean> {
   const pattern = toOriginPattern(rawUrl)
   if (!pattern) return false
   // 在 next dev 普通页面下没有 chrome.permissions API，直接放行
-  if (typeof chrome === 'undefined' || !(chrome as any).permissions) return true
+  if (typeof chrome === 'undefined' || !chrome || !chrome.permissions) return true
   try {
-    const has = await (chrome as any).permissions.contains({ origins: [pattern] })
+    const has = await chrome.permissions.contains({ origins: [pattern] })
     if (has) return true
-    return await (chrome as any).permissions.request({ origins: [pattern] })
+    return await chrome.permissions.request({ origins: [pattern] })
   } catch (e) {
     console.warn('chrome.permissions 调用失败:', e)
     // 没拿到 API 时默认放行，避免开发态被拦截

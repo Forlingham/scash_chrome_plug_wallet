@@ -107,3 +107,25 @@ interface DapOutputsResult {
   dapAmount: number
   chunkCount: number
 }
+
+
+// ========== Chrome 扩展 API（最小化 ambient 声明） ==========
+// 我们只用到 chrome.permissions 的 contains / request。
+// 不引 @types/chrome（体积大且大部分用不到），只声明实际用到的部分。
+// 在 next dev 普通页面环境下 chrome 为 undefined，所以类型是 union with undefined。
+
+interface ChromePermissionsRequest {
+  origins?: string[]
+  permissions?: string[]
+}
+
+interface ChromePermissionsApi {
+  contains: (perms: ChromePermissionsRequest) => Promise<boolean>
+  request: (perms: ChromePermissionsRequest) => Promise<boolean>
+}
+
+interface ChromeNamespace {
+  permissions?: ChromePermissionsApi
+}
+
+declare const chrome: ChromeNamespace | undefined
