@@ -7,6 +7,15 @@ import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Toast 通知样式（Chrome 插件桌面化重塑）
+ * - 旧：紫粉渐变 + 紫色阴影（移动端 App 风格）
+ * - 新：实色 zinc-900 + 主题色描边（emerald / red / amber），桌面工具风格
+ *
+ * Viewport 已经针对 popup 适配：
+ *   sm:right-4 + max-w-[320px]，确保 360px 窗口里 toast 不会贴边或被截断。
+ */
+
 const ToastProvider = ToastPrimitives.Provider
 
 const ToastViewport = React.forwardRef<
@@ -16,7 +25,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-8 left-2 right-2 z-[100] flex max-h-screen w-full max-w-[420px] flex-col gap-2 p-0 sm:top-4 sm:left-auto sm:right-4",
+      "fixed top-2 left-2 right-2 z-[100] flex max-h-screen w-auto flex-col gap-1.5 p-0 sm:top-2 sm:left-auto sm:right-2 sm:max-w-[320px]",
       className
     )}
     {...props}
@@ -25,17 +34,22 @@ const ToastViewport = React.forwardRef<
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName
 
 const toastVariants = cva(
-  "group pointer-events-auto relative flex w-full items-center justify-between space-x-4 overflow-hidden rounded-xl border-2 p-4 pr-10 shadow-2xl backdrop-blur-md transition-all duration-300 ease-out data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-right-full data-[state=closed]:zoom-out-95 data-[state=open]:slide-in-from-top-full data-[state=open]:zoom-in-95 data-[state=open]:sm:slide-in-from-bottom-full",
+  "group pointer-events-auto relative flex w-full items-start gap-2 overflow-hidden rounded-lg border bg-zinc-900 p-3 pr-8 shadow-lg backdrop-blur-md transition-all data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-top-full data-[state=open]:sm:slide-in-from-top-full",
   {
     variants: {
       variant: {
-        default: "border-purple-500/30 bg-gradient-to-r from-purple-900/90 to-pink-900/90 text-white shadow-purple-500/25",
+        // 默认：中性灰 + 左侧 emerald 强调线
+        default:
+          "border-zinc-800 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-emerald-500",
+        // 错误：红色描边 + 左侧红色强调线
         destructive:
-          "border-red-500/30 bg-gradient-to-r from-red-900/90 to-pink-900/90 text-white shadow-red-500/25",
+          "border-red-500/30 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-red-500",
+        // 成功：emerald 描边
         success:
-          "border-green-500/30 bg-gradient-to-r from-green-900/90 to-emerald-900/90 text-white shadow-green-500/25",
+          "border-emerald-500/30 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-emerald-500",
+        // 警告：琥珀色
         warning:
-          "border-yellow-500/30 bg-gradient-to-r from-yellow-900/90 to-orange-900/90 text-white shadow-yellow-500/25",
+          "border-amber-500/30 text-zinc-100 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-amber-500",
       },
     },
     defaultVariants: {
@@ -66,7 +80,7 @@ const ToastAction = React.forwardRef<
   <ToastPrimitives.Action
     ref={ref}
     className={cn(
-      "inline-flex h-8 shrink-0 items-center justify-center rounded-md border bg-transparent px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-secondary focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-destructive/30 group-[.destructive]:hover:bg-destructive group-[.destructive]:hover:text-destructive-foreground group-[.destructive]:focus:ring-destructive",
+      "inline-flex h-7 shrink-0 items-center justify-center rounded-md border border-zinc-700 bg-transparent px-2.5 text-xs font-medium transition-colors hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-background disabled:pointer-events-none disabled:opacity-50",
       className
     )}
     {...props}
@@ -81,13 +95,13 @@ const ToastClose = React.forwardRef<
   <ToastPrimitives.Close
     ref={ref}
     className={cn(
-      "absolute right-2 top-2 rounded-full p-1.5 text-white/70 opacity-100 transition-all duration-200 hover:text-white hover:bg-white/20 hover:scale-110 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-white/50 active:scale-95",
+      "absolute right-1.5 top-1.5 rounded-sm p-1 text-zinc-400 opacity-70 transition-all hover:opacity-100 hover:text-zinc-100 hover:bg-zinc-800 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-zinc-500",
       className
     )}
     toast-close=""
     {...props}
   >
-    <X className="h-4 w-4" />
+    <X className="h-3 w-3" />
   </ToastPrimitives.Close>
 ))
 ToastClose.displayName = ToastPrimitives.Close.displayName
@@ -98,7 +112,7 @@ const ToastTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Title
     ref={ref}
-    className={cn("text-sm font-bold text-white", className)}
+    className={cn("text-xs font-semibold text-zinc-100 leading-tight", className)}
     {...props}
   />
 ))
@@ -110,7 +124,7 @@ const ToastDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ToastPrimitives.Description
     ref={ref}
-    className={cn("text-sm text-white/90 leading-relaxed", className)}
+    className={cn("text-[11px] text-zinc-400 leading-relaxed mt-0.5", className)}
     {...props}
   />
 ))

@@ -1,14 +1,22 @@
 'use client'
 
-// 二维码扫描器
-// 与 web 钱包 components/qr-scanner.tsx 同源；扩展 popup 中相机权限会由 Chrome
-// 在用户点击"开始扫描"时弹窗请求，无需在 manifest 显式声明。
-// 不可用相机时自动降级为图片上传识别。
+// 二维码扫描器（Chrome 插件桌面化重塑）
+// ----------------------------------------------------------------------
+// 业务逻辑完全保留：
+//   - 自动检测可用相机；申请 getUserMedia（Chrome 会在用户点击后弹权限框）
+//   - 没相机或权限拒绝 → 优雅降级为图片上传识别
+//   - 300ms 轮询解码当前 video frame
+//
+// 视觉重塑：
+//   - 紫色按钮 → emerald success 变体
+//   - 扫描框边框 green-400 → emerald-400
+//   - 弹层尺寸适配 popup（占满 inset，不再 max-w-md）
+//   - 紧凑化字号 / 间距
+// ----------------------------------------------------------------------
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import QrScanner from 'qr-scanner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { X, Camera, CameraOff, RefreshCw, Image as ImageIcon } from 'lucide-react'
 import { useLanguage } from '@/contexts/language-context'
 
@@ -98,8 +106,8 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
         video: {
           facingMode: 'environment',
           width: { ideal: 640 },
-          height: { ideal: 480 }
-        }
+          height: { ideal: 480 },
+        },
       }
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
@@ -178,11 +186,14 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
       const errorMessage = err instanceof Error ? err.message : '未知错误'
       if (errorMessage.includes('Permission denied') || errorMessage.includes('NotAllowedError')) {
         setError(t('qr.errorDesc'))
-      } else if (errorMessage.includes('NotFoundError') || errorMessage.includes('DevicesNotFoundError')) {
+      } else if (
+        errorMessage.includes('NotFoundError') ||
+        errorMessage.includes('DevicesNotFoundError')
+      ) {
         setError(t('qr.error'))
         setHasCamera(false)
       } else {
-        setError(`摄像头启动失败: ${errorMessage}`)
+        setError(`${t('qr.error')}: ${errorMessage}`)
       }
       return false
     } finally {
@@ -223,18 +234,18 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
       try {
-        // @ts-ignore qr-scanner 类型定义对 canvas 入参不严格
+        // @ts-ignore qr-scanner 类型对 canvas 入参不严格
         const result = await QrScanner.scanImage(canvas, {
           returnDetailedScanResult: true,
           highlightScanRegion: false,
-          highlightCodeOutline: false
+          highlightCodeOutline: false,
         })
         if (result && result.data) {
           onScanResult(result.data)
           onClose()
         }
       } catch {
-        // 没找到二维码，继续轮询
+        // 无二维码，继续轮询
       }
     } catch (err) {
       console.error('扫描二维码失败:', err)
@@ -289,7 +300,7 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
         if (fileInputRef.current) fileInputRef.current.value = ''
       }
     },
-    [onScanResult, onClose]
+    [onScanResult, onClose],
   )
 
   const triggerFileUpload = useCallback(() => fileInputRef.current?.click(), [])
@@ -327,113 +338,137 @@ export function QRScannerComponent({ isOpen, onClose, onScanResult }: QRScannerP
   if (!isOpen) return null
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-gray-900 border-gray-700">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white">{t('qr.title')}</h3>
-            <Button onClick={handleClose} variant="ghost" size="sm" className="text-gray-400 hover:text-white">
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
+    <div className="absolute inset-0 z-50 bg-zinc-950/90 backdrop-blur-sm flex items-stretch justify-center">
+      <div className="w-full bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden flex flex-col">
+        {/* 顶栏 */}
+        <div className="flex items-center justify-between px-3 h-10 border-b border-zinc-800 shrink-0">
+          <h3 className="text-sm font-semibold text-zinc-100">{t('qr.title')}</h3>
+          <Button
+            onClick={handleClose}
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-          <div className="space-y-4">
-            <div className="relative aspect-square bg-black rounded-lg overflow-hidden">
-              {hasCamera ? (
-                <>
-                  <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-                  <canvas ref={canvasRef} className="hidden" />
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <CameraOff className="h-12 w-12 mx-auto mb-2" />
-                    <p>{t('qr.error')}</p>
-                  </div>
+        {/* 主体 */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2.5">
+          {/* 视频预览区 */}
+          <div className="relative aspect-square bg-black rounded-md overflow-hidden border border-zinc-800/60">
+            {hasCamera ? (
+              <>
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                  autoPlay
+                />
+                <canvas ref={canvasRef} className="hidden" />
+              </>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-zinc-400">
+                <div className="text-center">
+                  <CameraOff className="h-8 w-8 mx-auto mb-1.5" />
+                  <p className="text-xs">{t('qr.error')}</p>
                 </div>
-              )}
-
-              {isInitializing && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  <div className="text-center text-white">
-                    <RefreshCw className="h-8 w-8 mx-auto mb-2 animate-spin" />
-                    <p className="text-sm">{t('qr.loading')}</p>
-                  </div>
-                </div>
-              )}
-
-              {isScanning && !isInitializing && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 border-2 border-green-400 rounded-lg relative">
-                    <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-green-400"></div>
-                    <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-green-400"></div>
-                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-green-400"></div>
-                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-green-400"></div>
-                    <div className="absolute inset-0 overflow-hidden">
-                      <div className="w-full h-0.5 bg-green-400 animate-pulse absolute top-1/2 transform -translate-y-1/2"></div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {error && (
-              <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-700 rounded-lg p-2">
-                <p>{error}</p>
-                <Button onClick={handleRetry} variant="ghost" size="sm" className="mt-2 text-red-400 hover:text-red-300">
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                  {t('qr.retry')}
-                </Button>
               </div>
             )}
 
-            <div className="text-center">
-              {isInitializing ? (
-                <p className="text-yellow-400 text-sm">{t('qr.loading')}</p>
-              ) : isScanning ? (
-                <p className="text-green-400 text-sm">{t('qr.scanning')}</p>
-              ) : hasCamera ? (
-                <p className="text-gray-400 text-sm">{t('qr.cameraStopped')}</p>
-              ) : (
-                <p className="text-gray-400 text-sm">{t('qr.checkPermissions')}</p>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <div className="flex gap-2">
-                {hasCamera && (
-                  <Button
-                    onClick={toggleScanning}
-                    disabled={isInitializing}
-                    className="flex-1 bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50"
-                  >
-                    {isScanning ? (
-                      <>
-                        <CameraOff className="h-4 w-4 mr-2" />
-                        {t('qr.stopScanning')}
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="h-4 w-4 mr-2" />
-                        {t('qr.startScanning')}
-                      </>
-                    )}
-                  </Button>
-                )}
-                <Button onClick={triggerFileUpload} variant="outline" className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-800">
-                  <ImageIcon className="h-4 w-4 mr-2" />
-                  {t('qr.upload')}
-                </Button>
+            {isInitializing && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                <div className="text-center text-zinc-100">
+                  <RefreshCw className="h-6 w-6 mx-auto mb-1.5 animate-spin" />
+                  <p className="text-xs">{t('qr.loading')}</p>
+                </div>
               </div>
-              <Button onClick={handleClose} variant="ghost" className="w-full text-gray-400 hover:text-white">
-                {t('qr.cancel')}
+            )}
+
+            {/* 扫描框（emerald 角标 + 扫描线） */}
+            {isScanning && !isInitializing && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-40 h-40 relative">
+                  <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-emerald-400" />
+                  <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-emerald-400" />
+                  <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-emerald-400" />
+                  <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-emerald-400" />
+                  <div className="absolute inset-0 overflow-hidden">
+                    <div className="w-full h-px bg-emerald-400 animate-pulse absolute top-1/2 -translate-y-1/2 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 错误 */}
+          {error && (
+            <div className="text-center bg-red-500/10 border border-red-500/30 rounded-md p-2">
+              <p className="text-[11px] text-red-400 leading-relaxed">{error}</p>
+              <Button onClick={handleRetry} variant="ghost" size="xs" className="mt-1 text-red-400 hover:text-red-300">
+                <RefreshCw className="h-3 w-3" />
+                {t('qr.retry')}
               </Button>
             </div>
+          )}
 
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+          {/* 状态文字 */}
+          <div className="text-center">
+            {isInitializing ? (
+              <p className="text-[11px] text-amber-400">{t('qr.loading')}</p>
+            ) : isScanning ? (
+              <p className="text-[11px] text-emerald-400">{t('qr.scanning')}</p>
+            ) : hasCamera ? (
+              <p className="text-[11px] text-zinc-400">{t('qr.cameraStopped')}</p>
+            ) : (
+              <p className="text-[11px] text-zinc-400">{t('qr.checkPermissions')}</p>
+            )}
           </div>
-        </CardContent>
-      </Card>
+
+          {/* 操作 */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              {hasCamera && (
+                <Button
+                  onClick={toggleScanning}
+                  disabled={isInitializing}
+                  variant="success"
+                  size="sm"
+                  className="flex-1"
+                >
+                  {isScanning ? (
+                    <>
+                      <CameraOff className="h-3.5 w-3.5" />
+                      {t('qr.stopScanning')}
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="h-3.5 w-3.5" />
+                      {t('qr.startScanning')}
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button onClick={triggerFileUpload} variant="outline" size="sm" className="flex-1">
+                <ImageIcon className="h-3.5 w-3.5" />
+                {t('qr.upload')}
+              </Button>
+            </div>
+            <Button onClick={handleClose} variant="ghost" size="sm" className="w-full">
+              {t('qr.cancel')}
+            </Button>
+          </div>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            accept="image/*"
+            onChange={handleFileUpload}
+          />
+        </div>
+      </div>
     </div>
   )
 }
