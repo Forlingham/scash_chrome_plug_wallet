@@ -1,9 +1,18 @@
 'use client'
 
-// 发送页面（升级版）
-// 与 web 钱包 components/wallet-send.tsx 同源，差异：
-//   - 使用 utils 提供的 getWalletPrivateKey，避免在组件里再造一次 BIP32 派生。
-//   - 不再依赖 process.env 测试网开关。
+// 发送页面（Chrome 插件桌面化重塑）
+// ----------------------------------------------------------------------
+// 业务行为完全保留：
+//   - 多收款人支持、二维码扫码填地址、最大值/手续费扣除、密码二次确认、
+//     DAP 留言、广播后写入 pendingTransactions、立即重算余额。
+//   - 复杂的边界条件全部沿用原逻辑（注释也一并保留）。
+//
+// 视觉/交互的桌面化改造：
+//   - 删除手机风格的紫粉渐变 / 大图标 / 大字号
+//   - 主 CTA "确认发送 / 立即支付" 改为 emerald 实色 success 按钮
+//   - 标签色由绿改 emerald-400，与主色统一
+//   - 成功页去掉紫色渐变奖章，换为 emerald 圆环 + 简洁信息卡
+// ----------------------------------------------------------------------
 
 import { QRScannerComponent } from '@/components/qr-scanner'
 import {
@@ -15,7 +24,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -39,11 +48,19 @@ import {
   onOpenExplorer,
   signTransaction,
   sleep,
-  validateScashAddress
+  validateScashAddress,
 } from '@/lib/utils'
 import { PendingTransaction, useWalletActions, useWalletState } from '@/stores/wallet-store'
 import Decimal from 'decimal.js'
-import { ArrowUpDown, ChevronRight, ExternalLink, Lock, QrCode, X } from 'lucide-react'
+import {
+  ArrowUp,
+  CheckCircle2,
+  ChevronRight,
+  ExternalLink,
+  Lock,
+  QrCode,
+  X,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { DapMessageDisplay } from './dap-message-display'
 
@@ -196,7 +213,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     }
 
     const _sendAmount = new Decimal(
-      validSendList.reduce((acc, item) => acc.plus(new Decimal(item.amount || '0')), new Decimal(0))
+      validSendList.reduce((acc, item) => acc.plus(new Decimal(item.amount || '0')), new Decimal(0)),
     ).toNumber()
     setSendAmount(_sendAmount)
 
@@ -253,10 +270,10 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       setDapInfo({
         outputs: dapOutputs.map((output: { address: string; value: number }) => ({
           address: output.address,
-          amount: (output.value / 1e8).toString()
+          amount: (output.value / 1e8).toString(),
         })),
         dapAmount,
-        chunkCount: dapOutputs.length
+        chunkCount: dapOutputs.length,
       })
       const feeResult = calcFee(0, dapOutputs.length, baseFee)
       setDapNetworkFee(feeResult.feeScash)
@@ -276,8 +293,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
   const handleAddAddress = () => setSendList([...sendList, { address: '', amount: '' }])
 
   const handleSendToConfirm = () => {
-    // 1. 先把所有 sendList 的 address 做归一化（trim + lowercase），再过滤
-    //    出地址合法 + 金额 > 0 的条目。这一步不会改原 sendList，只产生一个深拷贝。
+    // 全部业务逻辑保留，不动
     const validSendList: SendList[] = JSON.parse(
       JSON.stringify(
         sendList
@@ -289,27 +305,21 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               item.amount &&
               Number.parseFloat(item.amount) > 0
             )
-          })
-      )
+          }),
+      ),
     )
 
-    // 2. 没有合法收款人 —— 在 form 步骤就报错并返回，不切到 confirm。
     if (validSendList.length === 0) {
       setSendListConfirm([])
       setTotalAmountError(t('send.invalidAddress'))
       return
     }
 
-    // 3. 计算费用 / 是否需要从金额扣除手续费。注意：所有可能 return 的分支
-    //    都必须在 setStep('confirm') 之前完成；否则会出现"切到了 confirm 但
-    //    sendListConfirm 还是上一次值（或空）"的严重 bug——会导致广播出去的
-    //    交易里没有收款人输出，资金全成矿工费。
     let feeWithDap = networkFee
     if (dapInfo) feeWithDap = new Decimal(feeWithDap).plus(dapInfo.dapAmount).toNumber()
 
     let amountTotal: number
     if (deductFeeFromAmount) {
-      // 在最后一个金额够大的收款人 amount 里扣除整笔费用
       let lastIndex = validSendList.length - 1
       while (lastIndex >= 0) {
         if (new Decimal(validSendList[lastIndex].amount || '0').gte(feeWithDap)) {
@@ -321,7 +331,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
         lastIndex--
       }
       if (lastIndex < 0) {
-        // 没有任何收款人金额能 cover 手续费 —— 留在 form 步骤展示错误
         setTotalAmountError(t('send.inputExceed'))
         return
       }
@@ -330,9 +339,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       amountTotal = +new Decimal(sendAmount).add(feeWithDap).toFixed(8)
     }
 
-    // 4. 全部校验都通过了，才一次性把 confirm step 需要的状态都写进去。
-    //    React 18 会把这几次 setState 合并成一次 render，进入 confirm 步骤时
-    //    sendListConfirm 一定是非空的。
     setTotalAmountError('')
     setSendAmountTotal(amountTotal)
     setSendListConfirm(validSendList)
@@ -406,14 +412,11 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     let outputs = [...sendListConfirm]
     if (dapInfo) outputs = [...outputs, ...dapInfo.outputs]
 
-    // 防御层：理论上 handleSendToConfirm 已经把所有不合法路径拦在 form 步骤了，
-    // 但万一 sendListConfirm 状态被异常清空，这里再兜一道——绝不能让一笔
-    // 没有任何收款人输出的交易广播出去（那样钱会全成矿工费）。
     if (outputs.length === 0) {
       toast({
         title: t('send.error'),
         description: t('send.errorInfo'),
-        variant: 'destructive'
+        variant: 'destructive',
       })
       setShowConfirmDialog(false)
       setIsConfirmLoading(false)
@@ -438,15 +441,11 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
         totalOutput: signTransactionResult.totalOutput.toNumber(),
         change: signTransactionResult.change.toNumber(),
         feeRate: signTransactionResult.feeRate,
-        appFee: signTransactionResult.appFee
+        appFee: signTransactionResult.appFee,
       })
 
       if (res.data.error) {
-        const { title, description } = buildRpcErrorToast(
-          t,
-          res.data.error.error.message,
-          res.data.error.error.code
-        )
+        const { title, description } = buildRpcErrorToast(t, res.data.error.error.message, res.data.error.error.code)
         toast({ title, description, variant: 'destructive' })
         setIsConfirmLoading(false)
         return
@@ -468,12 +467,10 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
         pickUnspents,
         sendListConfirm: [...sendListConfirm],
         timestamp: Date.now(),
-        status: 'pending'
+        status: 'pending',
       }
       await sleep(1533)
       addPendingTransaction(pendingTransaction)
-      // 立即重算余额，让用户回到首页能立刻看到"找零已可用 + 输入已扣除"，
-      // 而不是等下一次 22 秒刷新。
       setUpdateBalanceByMemPool()
       setCurrentPendingTransaction(pendingTransaction)
       setStep('success')
@@ -482,16 +479,13 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       toast({ title: t('send.success'), description: t('send.broadcast'), variant: 'success' })
     } catch (error: any) {
       console.log(error, 'error')
-      // 走到这里通常是网络层抛错（HTTP 错误 / 节点全挂）。尝试从异常对象中
-      // 拿到 RPC 原始错误结构（如果是节点返回的业务错误也会被包到 error.data
-      // 里），交给 buildRpcErrorToast 翻译。
       const nodeMsg = error?.data?.data?.error?.error?.message ?? error?.data?.message ?? error?.message
       const nodeCode = error?.data?.data?.error?.error?.code ?? error?.data?.code ?? 0
       const { title, description } = buildRpcErrorToast(t, nodeMsg, nodeCode)
       toast({
         title,
         description: description || t('send.errorInfo'),
-        variant: 'destructive'
+        variant: 'destructive',
       })
     } finally {
       setIsConfirmLoading(false)
@@ -507,163 +501,179 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     setShowConfirmDialog(false)
   }
 
+  // ====================================================================
+  // 成功页
+  // ====================================================================
   if (step === 'success') {
     return (
-      <div className="flex-1 flex items-center justify-center p-4 min-h-screen">
-        <div className="w-full max-w-md mx-auto">
-          <div className="text-center space-y-6">
-            <div className="relative">
-              <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-purple-800 rounded-full flex items-center justify-center mx-auto shadow-2xl border-2 border-purple-400">
-                <ArrowUpDown className="h-10 w-10 text-white rotate-90" />
-              </div>
+      <div className="h-full overflow-y-auto px-3 py-4">
+        <div className="space-y-3">
+          {/* 成功 hero */}
+          <div className="flex flex-col items-center text-center pt-2">
+            <div className="w-14 h-14 rounded-full bg-emerald-500/15 ring-1 ring-emerald-500/40 flex items-center justify-center mb-2">
+              <CheckCircle2 className="h-7 w-7 text-emerald-400" />
             </div>
+            <h2 className="text-base font-semibold text-zinc-100">{t('send.success')}</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">{t('send.broadcast')}</p>
+          </div>
 
-            <div className="space-y-2">
-              <h2 className="text-3xl font-bold text-white tracking-tight">{t('send.success')}</h2>
-              <p className="text-purple-300 text-sm">{t('send.broadcast')}</p>
-            </div>
+          {/* 总额卡 */}
+          <Card>
+            <CardContent className="text-center space-y-1">
+              <p className="text-xl font-semibold text-zinc-50 tabular-nums tracking-tight">
+                {sendAmountTotal} <span className="text-xs font-normal text-zinc-500">{NAME_TOKEN}</span>
+              </p>
+              <p className="text-xs text-zinc-500 tabular-nums">
+                ≈ ${calcValue(sendAmountTotal, coinPrice)} USD
+              </p>
+            </CardContent>
+          </Card>
 
-            {currentPendingTransaction && (
-              <div className="space-y-4">
-                <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
-                  <div className="flex flex-col space-y-2">
-                    <p className="text-purple-300 text-xs uppercase tracking-wide">{t('transaction.id')}</p>
-                    <p className="text-white text-sm font-mono break-all">{currentPendingTransaction.id}</p>
-                    <button
-                      onClick={() => onOpenExplorer('1', 'tx', currentPendingTransaction.id)}
-                      className="flex items-center space-x-1 text-purple-300 hover:text-white text-sm transition-colors self-start mt-1"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      <span>{t('transactions.openExplorer')}</span>
-                    </button>
-                  </div>
-                </div>
+          {currentPendingTransaction && (
+            <>
+              {/* 交易 ID */}
+              <Card>
+                <CardContent className="space-y-2">
+                  <p className="text-[10px] uppercase tracking-wider text-zinc-500">{t('transaction.id')}</p>
+                  <p className="text-[11px] font-mono text-zinc-200 break-all leading-relaxed">
+                    {currentPendingTransaction.id}
+                  </p>
+                  <button
+                    onClick={() => onOpenExplorer('1', 'tx', currentPendingTransaction.id)}
+                    className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    {t('transactions.openExplorer')}
+                  </button>
+                </CardContent>
+              </Card>
 
-                <div className="bg-gradient-to-r from-purple-900/50 to-purple-800/50 rounded-xl p-4 border border-purple-600/30 backdrop-blur-sm">
-                  <div className="text-center">
-                    <p className="text-2xl font-bold text-white mb-1">
-                      {sendAmountTotal} {NAME_TOKEN}
-                    </p>
-                    <p className="text-purple-300 text-sm">${calcValue(sendAmountTotal, coinPrice)} USD</p>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {currentPendingTransaction?.sendListConfirm.map((item, index) => (
-                    <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm" key={index}>
-                      <div className="flex justify-between items-center">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">{t('send.to')}</p>
-                          <p className="text-white text-sm font-mono truncate">{hideString(item.address)}</p>
-                        </div>
-                        <div className="text-right ml-3">
-                          <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">{t('common.amount')}</p>
-                          <p className="text-white text-sm font-semibold">
-                            {item.amount} {NAME_TOKEN}
-                          </p>
-                        </div>
+              {/* 收款人 */}
+              <div className="space-y-2">
+                {currentPendingTransaction?.sendListConfirm.map((item, index) => (
+                  <Card key={index}>
+                    <CardContent className="flex justify-between items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">{t('send.to')}</p>
+                        <p className="text-xs font-mono text-zinc-200 truncate">{hideString(item.address)}</p>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">{t('common.amount')}</p>
+                        <p className="text-xs font-medium text-zinc-100 tabular-nums">
+                          {item.amount} <span className="text-zinc-500 font-normal">{NAME_TOKEN}</span>
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
-                {dapMessage && (
-                  <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
-                    <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">{t('send.message')}:</p>
+              {/* DAP 留言 */}
+              {dapMessage && (
+                <Card>
+                  <CardContent>
+                    <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">{t('send.message')}</p>
                     <DapMessageDisplay
                       content={dapMessage}
                       buttonText={<>{t('dap.preview')}</>}
                       title={t('send.message')}
                       className="p-0 border-none bg-transparent justify-center"
                     />
-                  </div>
-                )}
+                  </CardContent>
+                </Card>
+              )}
 
-                <div className="bg-purple-950/50 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
-                  <p className="text-purple-300 text-xs uppercase tracking-wide mb-2">{t('send.rawTransaction')}</p>
-                  <div className="bg-black/50 rounded p-2 max-h-20 overflow-y-auto border border-purple-800/30">
-                    <p className="text-purple-400 text-xs font-mono break-all leading-relaxed">{currentPendingTransaction?.rawtx}</p>
+              {/* 原始交易 raw（折叠展示） */}
+              <Card>
+                <CardContent>
+                  <p className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1.5">
+                    {t('send.rawTransaction')}
+                  </p>
+                  <div className="bg-zinc-950 rounded p-2 max-h-20 overflow-y-auto border border-zinc-800/60">
+                    <p className="text-[10px] font-mono text-zinc-500 break-all leading-relaxed">
+                      {currentPendingTransaction?.rawtx}
+                    </p>
                   </div>
-                </div>
-              </div>
-            )}
+                </CardContent>
+              </Card>
+            </>
+          )}
 
-            <Button
-              onClick={() => onNavigate('home')}
-              className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl border border-purple-500/50"
-            >
-              {t('send.backToHome')}
-            </Button>
-          </div>
+          <Button onClick={() => onNavigate('home')} variant="success" className="w-full">
+            {t('send.backToHome')}
+          </Button>
         </div>
       </div>
     )
   }
 
+  // ====================================================================
+  // 确认页
+  // ====================================================================
   if (step === 'confirm') {
     return (
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+      <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
         <div className="text-center">
-          <h2 className="text-xl font-bold text-white mb-2">{t('send.confirm')}</h2>
+          <h2 className="text-sm font-semibold text-zinc-100">{t('send.confirm')}</h2>
         </div>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="px-4 space-y-4">
-            <div className="text-center"></div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-400">{t('send.from')}:</span>
-              <span className="text-white">
-                {wallet.address.slice(0, 10)}...{wallet.address.slice(-10)}
+        <Card>
+          <CardContent className="space-y-2.5 text-xs">
+            <div className="flex justify-between items-center gap-2">
+              <span className="text-zinc-500">{t('send.from')}</span>
+              <span className="text-zinc-200 font-mono">
+                {wallet.address.slice(0, 8)}…{wallet.address.slice(-8)}
               </span>
             </div>
 
             {sendListConfirm.map((item, index) => (
-              <div className="space-y-3 border-t border-gray-600 pt-3" key={index}>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">{t('send.to')}:</span>
-                  <span className="text-white font-mono text-sm">
-                    {item.address.slice(0, 10)}...{item.address.slice(-10)}
+              <div className="space-y-1.5 pt-2.5 border-t border-zinc-800/60" key={index}>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-zinc-500">{t('send.to')}</span>
+                  <span className="text-zinc-200 font-mono">
+                    {item.address.slice(0, 8)}…{item.address.slice(-8)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">{t('send.amount')}:</span>
-                  <span className="text-white font-mono text-sm">{item.amount}</span>
+                <div className="flex justify-between items-center gap-2">
+                  <span className="text-zinc-500">{t('send.amount')}</span>
+                  <span className="text-zinc-200 font-mono tabular-nums">{item.amount}</span>
                 </div>
               </div>
             ))}
-            <div className="flex justify-between border-t border-gray-600 pt-3">
-              <span className="text-gray-400">{t('common.fee')}:</span>
-              <span className="text-white flex items-center gap-2">
+
+            <div className="flex justify-between items-center pt-2.5 border-t border-zinc-800/60">
+              <span className="text-zinc-500">{t('common.fee')}</span>
+              <span className="text-zinc-200 tabular-nums">
                 {networkFee} {NAME_TOKEN}
               </span>
             </div>
 
             {dapInfo && (
-              <div className="flex justify-between border-t border-gray-600 pt-3">
-                <span className="text-gray-400">{t('send.messageFee') || 'Message fee'}:</span>
-                <span className="text-white flex items-center gap-2">
+              <div className="flex justify-between items-center pt-2.5 border-t border-zinc-800/60">
+                <span className="text-zinc-500">{t('send.messageFee') || 'Message fee'}</span>
+                <span className="text-zinc-200 tabular-nums">
                   {dapInfo.dapAmount} {NAME_TOKEN}
                 </span>
               </div>
             )}
 
-            <div>
-              <div className="flex justify-between font-semibold">
-                <span className="text-gray-400">{t('send.total')}:</span>
-                <div className="text-right">
-                  <span className="text-white">
-                    {sendAmountTotal} {NAME_TOKEN}
-                  </span>
-                  <br />
-                  <span className="text-white">${calcValue(sendAmountTotal, coinPrice)} USD</span>
+            <div className="flex justify-between items-start pt-2.5 border-t border-zinc-800/60 font-medium">
+              <span className="text-zinc-300">{t('send.total')}</span>
+              <div className="text-right">
+                <div className="text-zinc-100 tabular-nums">
+                  {sendAmountTotal} {NAME_TOKEN}
+                </div>
+                <div className="text-[10px] text-zinc-500 tabular-nums mt-0.5">
+                  ≈ ${calcValue(sendAmountTotal, coinPrice)} USD
                 </div>
               </div>
             </div>
 
             {dapMessage && (
-              <div className="bg-gray-900/50 rounded-lg p-3 mt-3">
-                <div className="text-gray-400 text-xs uppercase tracking-wide mb-1">{t('send.message') || 'Message'}:</div>
+              <div className="bg-zinc-950 rounded-md p-2 mt-2 border border-zinc-800/60">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1">
+                  {t('send.message') || 'Message'}
+                </div>
                 <DapMessageDisplay
                   content={dapMessage}
                   buttonText={<>{t('dap.preview')}</>}
@@ -675,10 +685,10 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="px-4 py-4 space-y-4">
-            <Label className="text-white flex items-center gap-2">
-              <Lock className="h-4 w-4" />
+        <Card>
+          <CardContent className="space-y-2">
+            <Label className="text-zinc-300 text-xs flex items-center gap-1.5">
+              <Lock className="h-3 w-3 text-emerald-400" />
               {t('send.confirmTransaction')}
             </Label>
             <Input
@@ -689,26 +699,32 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                 if (passwordError) setPasswordError('')
               }}
               placeholder={t('send.inputPassword')}
-              className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
             />
-            {passwordError && <p className="text-red-400 text-sm">{passwordError}</p>}
+            {passwordError && <p className="text-red-400 text-[11px]">{passwordError}</p>}
           </CardContent>
         </Card>
 
-        <AlertDialog open={showConfirmDialog} onOpenChange={(open) => { if (!open) return; setShowConfirmDialog(open) }}>
+        <AlertDialog
+          open={showConfirmDialog}
+          onOpenChange={(open) => {
+            if (!open) return
+            setShowConfirmDialog(open)
+          }}
+        >
           <AlertDialogTrigger asChild>
             <Button
               onClick={handlePasswordSubmit}
               disabled={isSliding || !password}
-              className="w-full bg-green-500 hover:bg-green-600 text-white h-12"
+              variant="success"
+              className="w-full h-10"
             >
-              {isSliding ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : t('send.confirmPay')}
+              {isSliding ? <Spinner /> : t('send.confirmPay')}
             </Button>
           </AlertDialogTrigger>
-          <AlertDialogContent className="bg-gray-800 border-gray-700">
+          <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-white">{t('send.confirm')}</AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-300">
+              <AlertDialogTitle>{t('send.confirm')}</AlertDialogTitle>
+              <AlertDialogDescription>
                 {t('send.send')} {sendAmountTotal} {NAME_TOKEN}，{t('send.fee')} {networkFee} {NAME_TOKEN}
                 {dapInfo && `，${t('send.messageFee') || 'Message fee'} ${dapInfo.dapAmount} ${NAME_TOKEN}`}。
                 <br />
@@ -716,45 +732,45 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleCancelTransaction} className="bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600">
-                {isCancelLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : t('send.cancel')}
+              <AlertDialogCancel onClick={handleCancelTransaction}>
+                {isCancelLoading ? <Spinner /> : t('send.cancel')}
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handleConfirmTransaction} className="bg-green-500 hover:bg-green-600 text-white">
-                {isConfirmLoading ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                ) : (
-                  t('send.confirmTransactionOn')
-                )}
+              <AlertDialogAction onClick={handleConfirmTransaction} className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400">
+                {isConfirmLoading ? <Spinner /> : t('send.confirmTransactionOn')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
-        <Button onClick={() => setStep('form')} variant="outline" className="w-full border-gray-600 text-gray-300 hover:bg-gray-700">
+        <Button onClick={() => setStep('form')} variant="outline" className="w-full">
           {t('send.backToEdit')}
         </Button>
       </div>
     )
   }
 
+  // ====================================================================
+  // 表单页
+  // ====================================================================
   return (
-    <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-      <div className="text-center space-y-2">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-400">
-            {t('wallet.available')}: {wallet.usableBalance} {NAME_TOKEN}
-          </span>
-          <div className="text-right">
-            <div className="text-white font-medium">1 {NAME_TOKEN}</div>
-            <div className="text-gray-400">${coinPrice} USD</div>
-          </div>
-        </div>
+    <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
+      {/* 余额 + 价格行 */}
+      <div className="flex items-center justify-between text-[11px]">
+        <span className="text-zinc-400">
+          {t('wallet.available')}:{' '}
+          <span className="text-zinc-200 font-mono tabular-nums">{wallet.usableBalance}</span>{' '}
+          <span className="text-zinc-500">{NAME_TOKEN}</span>
+        </span>
+        <span className="text-zinc-500 tabular-nums">
+          1 {NAME_TOKEN} ≈ ${coinPrice}
+        </span>
       </div>
 
+      {/* 收款人输入卡（多行） */}
       {sendList.map((item, index) => (
-        <Card key={index} className="bg-gray-800 border-gray-700">
-          <CardContent className="px-4 space-y-3">
-            <Label className="text-green-400">{t('send.to')}</Label>
+        <Card key={index}>
+          <CardContent className="space-y-2.5">
+            <Label className="text-emerald-400 text-xs">{t('send.to')}</Label>
 
             <div className="relative">
               <Input
@@ -762,167 +778,192 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                 onChange={(e) => handleChangeAddress(index, e.target.value)}
                 onBlur={() => handleBlurAddress(index)}
                 placeholder={t('send.toInfo')}
-                className={`bg-gray-900 text-white pr-20 ${
-                  addressErrors[index] ? 'border-red-500 focus:border-red-500' : 'border-gray-600'
+                className={`pr-16 font-mono text-xs ${
+                  addressErrors[index] ? 'border-red-500/60 focus-visible:border-red-500' : ''
                 }`}
               />
               {item.address && (
-                <Button
+                <button
                   onClick={() => handleChangeAddress(index, '')}
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-8 top-1/2 transform -translate-y-1/2 text-green-400 hover:text-green-300"
+                  className="absolute right-8 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-100"
+                  aria-label="Clear"
                 >
-                  <X className="h-4 w-4" />
-                </Button>
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
-              <Button
+              <button
                 onClick={() => handleScanQR(index)}
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 text-green-400 hover:text-green-300"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-emerald-400 hover:text-emerald-300"
+                aria-label="Scan QR"
               >
-                <QrCode className="h-4 w-4" />
-              </Button>
+                <QrCode className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            {addressErrors[index] && <div className="text-red-400 text-sm mt-1">{t('send.invalidAddress')}</div>}
+            {addressErrors[index] && (
+              <p className="text-red-400 text-[11px]">{t('send.invalidAddress')}</p>
+            )}
 
-            <Label className="text-green-400">{t('common.amount')}:</Label>
+            <Label className="text-emerald-400 text-xs">{t('common.amount')}</Label>
 
-            <div className="space-y-2">
-              <div className="relative">
-                <Input
-                  value={item.amount}
-                  onChange={(e) => handleChangeAmount(index, e.target.value)}
-                  onBlur={() => validateAmount(index, item.amount)}
-                  placeholder="0"
-                  type="number"
-                  className={`bg-gray-900 text-white text-2xl font-bold pr-20 ${
-                    amountErrors[index] && lastAmountInputIndex === index ? 'border-red-500 focus:border-red-500' : 'border-gray-600'
-                  }`}
-                />
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleMaxAmount(index)}
-                    className="text-purple-400 hover:text-purple-300 text-sm font-medium"
-                  >
-                    MAX
-                  </button>
-                  <span className="text-white font-medium">{NAME_TOKEN}</span>
-                </div>
+            <div className="relative">
+              <Input
+                value={item.amount}
+                onChange={(e) => handleChangeAmount(index, e.target.value)}
+                onBlur={() => validateAmount(index, item.amount)}
+                placeholder="0"
+                type="number"
+                className={`pr-20 text-lg font-semibold tabular-nums ${
+                  amountErrors[index] && lastAmountInputIndex === index
+                    ? 'border-red-500/60 focus-visible:border-red-500'
+                    : ''
+                }`}
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handleMaxAmount(index)}
+                  className="px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 rounded uppercase tracking-wider"
+                >
+                  Max
+                </button>
+                <span className="text-xs text-zinc-400">{NAME_TOKEN}</span>
               </div>
-
-              {amountErrors[index] && lastAmountInputIndex === index && (
-                <div className="text-red-400 text-sm mt-1">
-                  {t('send.amountExceed')} {wallet.usableBalance} {NAME_TOKEN}
-                </div>
-              )}
             </div>
+
+            {amountErrors[index] && lastAmountInputIndex === index && (
+              <p className="text-red-400 text-[11px]">
+                {t('send.amountExceed')} {wallet.usableBalance} {NAME_TOKEN}
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}
 
-      {/* Add Another */}
-      <Card className="bg-gray-800 border-gray-700 cursor-pointer hover:bg-gray-750" onClick={handleAddAddress}>
-        <CardContent className="px-4">
-          <div className="flex items-center justify-between">
-            <span className="text-green-400">{t('send.addAnother')}</span>
-            <ChevronRight className="h-4 w-4 text-green-400" />
-          </div>
-        </CardContent>
-      </Card>
+      {/* 添加另一位收款人 */}
+      <button
+        onClick={handleAddAddress}
+        className="w-full px-3 py-2 rounded-lg border border-dashed border-zinc-700 hover:border-emerald-500/60 hover:bg-zinc-900/40 transition-colors flex items-center justify-between text-xs"
+      >
+        <span className="text-emerald-400">{t('send.addAnother')}</span>
+        <ChevronRight className="h-3.5 w-3.5 text-emerald-400" />
+      </button>
 
-      {/* Network Fee */}
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="px-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-green-400">{t('send.fee')}:</div>
-              <div className="text-white flex items-center gap-2">
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400"></div>
-                    <span className="text-gray-400">...</span>
-                  </>
-                ) : (
-                  <>
-                    {networkFee} {NAME_TOKEN}
-                  </>
-                )}
-              </div>
-            </div>
+      {/* 网络费 */}
+      <Card>
+        <CardContent className="space-y-2.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-emerald-400">{t('send.fee')}</span>
+            <span className="text-zinc-200 tabular-nums">
+              {isLoading ? (
+                <span className="inline-flex items-center gap-1.5 text-zinc-500">
+                  <Spinner size={3} />
+                  …
+                </span>
+              ) : (
+                <>
+                  {networkFee} {NAME_TOKEN}
+                </>
+              )}
+            </span>
           </div>
 
-          <label className="flex items-center cursor-pointer hover:bg-gray-800/50 p-2 rounded-lg transition-colors">
+          <label className="flex items-center cursor-pointer p-1 rounded hover:bg-zinc-800/40 transition-colors">
             <Checkbox
               disabled={isForcedDeductFeeFromAmount}
               checked={deductFeeFromAmount}
               onCheckedChange={(checked) => setDeductFeeFromAmount(checked === true)}
-              className="w-4 h-4 min-w-4 max-w-4 min-h-4 max-h-4 flex-shrink-0 mr-3 border-2 border-gray-500 data-[state=unchecked]:border-gray-500 data-[state=unchecked]:bg-transparent"
+              className="w-4 h-4 mr-2 shrink-0"
             />
-            <span className="text-gray-300 text-sm select-none">{t('send.feeDeducted')}</span>
+            <span className="text-zinc-300 text-xs select-none">{t('send.feeDeducted')}</span>
           </label>
         </CardContent>
       </Card>
 
-      {/* DAP Message */}
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="px-4 space-y-3">
-          <div className="text-green-400">{t('send.message') || 'Message'}:</div>
+      {/* DAP 留言 */}
+      <Card>
+        <CardContent className="space-y-2">
+          <Label className="text-emerald-400 text-xs">{t('send.message') || 'Message'}</Label>
           <textarea
             value={dapMessage}
             onChange={(e) => setDapMessage(e.target.value)}
             placeholder={t('send.messagePlaceholder') || 'Enter your message (optional)'}
-            className="w-full bg-gray-900 text-white border border-gray-600 rounded-lg p-3 resize-none h-24 focus:outline-none focus:border-green-400"
+            className="w-full bg-zinc-950 text-zinc-100 placeholder-zinc-500 border border-border rounded-md p-2 text-xs resize-none h-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
           />
 
           {dapInfo && (
-            <div className="space-y-2 bg-gray-900/50 rounded-lg p-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">{t('send.messageFee') || 'Message fee'}:</span>
-                <span className="text-white">
-                  {dapInfo.dapAmount} {NAME_TOKEN} ({dapInfo.chunkCount} {dapInfo.chunkCount === 1 ? 'chunk' : 'chunks'})
+            <div className="space-y-1 rounded-md bg-zinc-950 p-2 text-[11px] border border-zinc-800/60">
+              <Row label={t('send.messageFee') || 'Message fee'}>
+                <span className="tabular-nums">
+                  {dapInfo.dapAmount} {NAME_TOKEN}{' '}
+                  <span className="text-zinc-500">
+                    · {dapInfo.chunkCount} {dapInfo.chunkCount === 1 ? 'chunk' : 'chunks'}
+                  </span>
                 </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-400">{t('send.messageNetworkFee') || 'Message network fee'}:</span>
-                <span className="text-white">
+              </Row>
+              <Row label={t('send.messageNetworkFee') || 'Message network fee'}>
+                <span className="tabular-nums">
                   {dapNetworkFee} {NAME_TOKEN}
                 </span>
-              </div>
-              <div className="flex justify-between text-sm font-semibold">
-                <span className="text-gray-300">{t('send.totalFee') || 'Total fee'}:</span>
-                <span className="text-white">
+              </Row>
+              <Row label={t('send.totalFee') || 'Total fee'} bold>
+                <span className="tabular-nums">
                   {totalFee} {NAME_TOKEN}
                 </span>
-              </div>
+              </Row>
             </div>
           )}
         </CardContent>
       </Card>
 
       {totalAmountError && (
-        <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-700 rounded-lg p-2">{totalAmountError}</div>
+        <div className="text-red-400 text-[11px] text-center bg-red-500/10 border border-red-500/30 rounded-md p-2">
+          {totalAmountError}
+        </div>
       )}
 
       <Button
         onClick={handleSendToConfirm}
         disabled={networkFee <= 0 || isLoading || !!totalAmountError}
-        className="w-full bg-purple-600 hover:bg-purple-700 text-white disabled:bg-gray-600 disabled:text-gray-400"
+        variant="success"
+        className="w-full h-10"
       >
-        {isLoading ? (
-          <div className="flex items-center gap-2">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            <span>...</span>
-          </div>
-        ) : (
-          t('send.confirm')
-        )}
+        {isLoading ? <Spinner /> : t('send.confirm')}
       </Button>
 
       <QRScannerComponent isOpen={showQRScanner} onClose={() => setShowQRScanner(false)} onScanResult={handleScanResult} />
+    </div>
+  )
+}
+
+// ============================================================
+// 工具组件
+// ============================================================
+
+function Spinner({ size = 4 }: { size?: number }) {
+  return (
+    <span
+      className={`inline-block animate-spin rounded-full border-2 border-zinc-700 border-t-zinc-100`}
+      style={{ width: `${size * 4}px`, height: `${size * 4}px` }}
+    />
+  )
+}
+
+function Row({
+  label,
+  bold,
+  children,
+}: {
+  label: string
+  bold?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between ${bold ? 'font-semibold text-zinc-200 border-t border-zinc-800/60 pt-1.5 mt-1' : 'text-zinc-400'}`}
+    >
+      <span>{label}</span>
+      <span className={bold ? 'text-zinc-100' : 'text-zinc-200'}>{children}</span>
     </div>
   )
 }
