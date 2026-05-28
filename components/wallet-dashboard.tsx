@@ -3,6 +3,7 @@
 import { LanguageSelector } from '@/components/language-selector'
 import { Button } from '@/components/ui/button'
 import { WalletAssets } from '@/components/wallet-assets'
+import { WalletEngrave } from '@/components/wallet-engrave'
 import { WalletHome } from '@/components/wallet-home'
 import { WalletReceive } from '@/components/wallet-receive'
 import { WalletSend } from '@/components/wallet-send'
@@ -20,15 +21,19 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
   const { t } = useLanguage()
   const [activeTab, setActiveTab] = useState('home')
   const [currentView, setCurrentView] = useState('home')
-  const { pendingTransactions,unspent } = useWalletState()
-  const { setUpdateBlockchaininfo, setUpdateBalance, setUpdateBalanceByMemPool } = useWalletActions()
+  const { pendingTransactions } = useWalletState()
+  const { setUpdateBlockchaininfo, setUpdateBalance, setUpdateBalanceByMemPool, setUpdateCoinPrice } = useWalletActions()
 
   const initGetWalletInfo = async () => {
-    await setUpdateBlockchaininfo()
-    await setUpdateBalance()
+    // 三件套并行：链状态 / 余额扫描 / 币价；币价失败不影响其它两者
+    await Promise.all([
+      setUpdateBlockchaininfo(),
+      setUpdateBalance(),
+      setUpdateCoinPrice().catch(() => undefined)
+    ])
     if (pendingTransactions.length) {
       setUpdateBalanceByMemPool()
-    }    
+    }
   }
 
   useEffect(() => {
@@ -37,6 +42,7 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
       initGetWalletInfo()
     }, 1000 * 22)
     return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleNavigation = (view: string) => {
@@ -60,6 +66,8 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
         return <WalletReceive onNavigate={handleNavigation} />
       case 'send':
         return <WalletSend onNavigate={handleNavigation} />
+      case 'engrave':
+        return <WalletEngrave onNavigate={handleNavigation} />
       case 'settings':
         return <WalletSettings onNavigate={handleNavigation} onLockWallet={handleLockWallet} />
       case 'buy':
@@ -105,6 +113,7 @@ export function WalletDashboard({ onLogout }: WalletDashboardProps) {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                   {currentView === 'receive' && t('receive.title')}
                   {currentView === 'send' && t('action.send')}
+                  {currentView === 'engrave' && t('action.engrave')}
                   {currentView === 'assets' && t('nav.assets')}
                   {currentView === 'settings' && t('settings.title')}
                   {['buy', 'sell', 'trade'].includes(currentView) &&

@@ -1,0 +1,560 @@
+'use client'
+
+// 链上刻字（DAP）页面
+// 功能：让用户把任意文字以 DAP 协议写入区块链。
+// 实现：与 web 钱包同源，通过 getDapInstance() 把文本编码成多个 DAP 输出，
+//       配合 signTransaction + sendrawtransaction 完成上链。
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { useLanguage } from '@/contexts/language-context'
+import { useToast } from '@/hooks/use-toast'
+import { onBroadcastApi, Unspent } from '@/lib/api'
+import {
+  calcFee,
+  calcValue,
+  decryptWallet,
+  getDapInstance,
+  getWalletPrivateKey,
+  NAME_TOKEN,
+  onOpenExplorer,
+  signTransaction,
+  sleep
+} from '@/lib/utils'
+import { PendingTransaction, useWalletActions, useWalletState } from '@/stores/wallet-store'
+import Decimal from 'decimal.js'
+import { ArrowLeft, ExternalLink, Lock, MessageSquare, Eye } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { DapMessageDisplay } from './dap-message-display'
+
+interface WalletEngraveProps {
+  onNavigate: (view: string) => void
+}
+
+export function WalletEngrave({ onNavigate }: WalletEngraveProps) {
+  const { wallet, coinPrice, unspent } = useWalletState()
+  const { getBaseFee, addPendingTransaction, setUpdateBalanceByMemPool } = useWalletActions()
+  const { t } = useLanguage()
+  const { toast } = useToast()
+  const [step, setStep] = useState<'form' | 'confirm' | 'success'>('form')
+
+  const [engraveText, setEngraveText] = useState<string>('')
+  const [dapInfo, setDapInfo] = useState<DapOutputsResult | null>(null)
+  const [appFee] = useState<number>(0.05)
+  const [networkFee, setNetworkFee] = useState<number>(0)
+  const [totalFee, setTotalFee] = useState<number>(0)
+  const [baseFee, setBaseFee] = useState<number>(0)
+  const [isLoading, setIsLoading] = useState<boolean>(false)
+
+  const [pickUnspents, setPickUnspents] = useState<Unspent[]>([])
+  const [password, setPassword] = useState<string>('')
+  const [passwordError, setPasswordError] = useState<string>('')
+  const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false)
+  const [currentPendingTransaction, setCurrentPendingTransaction] = useState<PendingTransaction>()
+
+  async function getInitData() {
+    setIsLoading(true)
+    try {
+      const getBaseFeeRes = await getBaseFee()
+      setBaseFee(getBaseFeeRes.fee)
+    } catch (error) {
+      console.log(error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    setUpdateBalanceByMemPool()
+    getInitData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // 文字 → DAP 输出
+  useEffect(() => {
+    if (!engraveText || !engraveText.trim()) {
+      setDapInfo(null)
+      setTotalFee(0)
+      return
+    }
+
+    const dap = getDapInstance()
+    if (!dap) {
+      setDapInfo(null)
+      return
+    }
+
+    try {
+      const dapOutputs = dap.createDapOutputs(engraveText)
+      const dapAmount = dapOutputs.reduce((sum: number, output: { value: number }) => sum + output.value, 0) / 1e8
+
+      setDapInfo({
+        outputs: dapOutputs.map((output: { address: string; value: number }) => ({
+          address: output.address,
+          amount: (output.value / 1e8).toString()
+        })),
+        dapAmount,
+        chunkCount: dapOutputs.length
+      })
+    } catch (error) {
+      console.error('创建 DAP 输出失败:', error)
+      setDapInfo(null)
+    }
+  }, [engraveText])
+
+  // 计算手续费 / 总额
+  useEffect(() => {
+    if (!dapInfo || !baseFee) {
+      setNetworkFee(0)
+      setTotalFee(0)
+      return
+    }
+    const inputCount = pickUnspents.length
+    const outputCount = dapInfo.outputs.length + 1 + 1
+    const feeResult = calcFee(inputCount, outputCount, baseFee)
+    setNetworkFee(feeResult.feeScash)
+    const total = new Decimal(dapInfo.dapAmount).plus(feeResult.feeScash).plus(appFee).toNumber()
+    setTotalFee(total)
+  }, [dapInfo, baseFee, pickUnspents, appFee])
+
+  // 选取可用 UTXO
+  useEffect(() => {
+    if (step !== 'form' || !baseFee || !totalFee || !dapInfo) return
+
+    const requiredAmount = new Decimal(dapInfo.dapAmount).plus(networkFee).plus(appFee)
+
+    let pickAmount = new Decimal(0)
+    const pickUnspentsArr: Unspent[] = []
+    for (const unspentItem of unspent) {
+      if (unspentItem.isHasMemPool || !unspentItem.isUsable) continue
+      pickAmount = pickAmount.plus(new Decimal(unspentItem.amount))
+      pickUnspentsArr.push(unspentItem)
+      if (pickAmount.gte(requiredAmount)) break
+    }
+
+    if (pickAmount.lt(requiredAmount)) {
+      setPickUnspents([])
+      return
+    }
+    setPickUnspents([...pickUnspentsArr])
+  }, [engraveText, baseFee, totalFee, networkFee, dapInfo, step, appFee, unspent])
+
+  const handleSendToConfirm = () => {
+    if (pickUnspents.length === 0 || !dapInfo) return
+    setStep('confirm')
+  }
+
+  const handlePasswordSubmit = () => {
+    if (!password) {
+      setPasswordError(t('wallet.lock.input'))
+      return
+    }
+    setPasswordError('')
+    setShowConfirmDialog(true)
+  }
+
+  const [isConfirmLoading, setIsConfirmLoading] = useState<boolean>(false)
+
+  const handleConfirmTransaction = async () => {
+    setIsConfirmLoading(true)
+    if (!dapInfo) {
+      setIsConfirmLoading(false)
+      return
+    }
+
+    const walletObj = decryptWallet(wallet.encryptedWallet, password)
+    if (!walletObj.isSuccess) {
+      setPasswordError(t('wallet.lock.error'))
+      setShowConfirmDialog(false)
+      setIsConfirmLoading(false)
+      return
+    }
+
+    if (!walletObj.wallet) {
+      setIsConfirmLoading(false)
+      return
+    }
+
+    const child = getWalletPrivateKey(walletObj.wallet.mnemonic)
+    const outputs = [...dapInfo.outputs]
+    const totalFeeRate = new Decimal(networkFee).plus(appFee).toNumber()
+    const signTransactionResult = signTransaction(pickUnspents, outputs, totalFeeRate, wallet.address, child, appFee)
+
+    if (!signTransactionResult.isSuccess) {
+      toast({ title: t('send.errorSign'), description: '', variant: 'destructive' })
+      setIsConfirmLoading(false)
+      return
+    }
+
+    try {
+      const res = await onBroadcastApi({
+        address: wallet.address,
+        txid: '',
+        rawtx: signTransactionResult.rawtx,
+        totalInput: signTransactionResult.totalInput.toNumber(),
+        totalOutput: signTransactionResult.totalOutput.toNumber(),
+        change: signTransactionResult.change.toNumber(),
+        feeRate: signTransactionResult.feeRate,
+        appFee: signTransactionResult.appFee
+      })
+
+      if (res.data.error) {
+        toast({
+          title: '错误码:' + res.data.error.error.code,
+          description: res.data.error.error.message,
+          variant: 'destructive'
+        })
+        setIsConfirmLoading(false)
+        return
+      }
+
+      if (!res.data.rpcData.txid) {
+        toast({ title: t('send.error'), description: t('send.errorTxid'), variant: 'destructive' })
+        setIsConfirmLoading(false)
+        return
+      }
+
+      const pendingTransaction: PendingTransaction = {
+        id: res.data.rpcData.txid,
+        rawtx: signTransactionResult.rawtx,
+        totalInput: signTransactionResult.totalInput.toNumber(),
+        totalOutput: signTransactionResult.totalOutput.toNumber(),
+        change: signTransactionResult.change.toNumber(),
+        feeRate: signTransactionResult.feeRate,
+        pickUnspents,
+        sendListConfirm: outputs,
+        timestamp: Date.now(),
+        status: 'pending'
+      }
+      await sleep(1533)
+      addPendingTransaction(pendingTransaction)
+      setCurrentPendingTransaction(pendingTransaction)
+      setStep('success')
+      setPassword('')
+      toast({ title: t('send.success'), description: t('send.broadcast'), variant: 'success' })
+    } catch (error: any) {
+      console.log(error, 'error')
+      toast({ title: t('send.error'), description: t('send.errorInfo'), variant: 'destructive' })
+    } finally {
+      setIsConfirmLoading(false)
+      setShowConfirmDialog(false)
+    }
+  }
+
+  const [isCancelLoading, setIsCancelLoading] = useState<boolean>(false)
+  const handleCancelTransaction = async () => {
+    setIsCancelLoading(true)
+    await sleep(1533)
+    setIsCancelLoading(false)
+    setShowConfirmDialog(false)
+  }
+
+  if (step === 'success') {
+    return (
+      <div className="min-h-full bg-gray-900 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center space-y-6">
+            <div className="relative">
+              <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-pink-500 rounded-full flex items-center justify-center mx-auto shadow-2xl border-2 border-purple-400">
+                <MessageSquare className="h-10 w-10 text-white" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-3xl font-bold text-white tracking-tight">{t('send.engraveSuccess')}</h2>
+              <p className="text-purple-300 text-sm">{t('send.engraveSuccessMsg')}</p>
+            </div>
+
+            {currentPendingTransaction && (
+              <div className="space-y-4">
+                <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
+                  <div className="flex flex-col space-y-2">
+                    <p className="text-purple-300 text-xs uppercase tracking-wide">Transaction ID</p>
+                    <p className="text-white text-sm font-mono break-all">{currentPendingTransaction.id}</p>
+                    <button
+                      onClick={() => onOpenExplorer('1', 'tx', currentPendingTransaction.id)}
+                      className="flex items-center space-x-1 text-purple-300 hover:text-white text-sm transition-colors self-start mt-1"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      <span>{t('transactions.openExplorer')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-gradient-to-r from-purple-900/50 to-pink-900/50 rounded-xl p-4 border border-purple-600/30 backdrop-blur-sm">
+                  <div className="text-center">
+                    <p className="text-purple-300 text-xs uppercase tracking-wide mb-2">{t('send.engraveContent')}</p>
+                    <DapMessageDisplay
+                      content={engraveText}
+                      buttonText={<>{t('dap.preview')}</>}
+                      title={t('dap.preview')}
+                      className="p-0 border-none bg-transparent justify-center"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-purple-300">{t('send.engraveLoss')}:</span>
+                    <span className="text-white">
+                      {dapInfo?.dapAmount.toFixed(8)} {NAME_TOKEN}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-2">
+                    <span className="text-purple-300">{t('send.engraveNetworkFee')}:</span>
+                    <span className="text-white">
+                      {networkFee.toFixed(8)} {NAME_TOKEN}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-2">
+                    <span className="text-purple-300">{t('send.engravePlatformFee')}:</span>
+                    <span className="text-white">
+                      {appFee.toFixed(8)} {NAME_TOKEN}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <Button
+              onClick={() => onNavigate('home')}
+              className="w-full bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl border border-purple-500/50"
+            >
+              {t('send.backToHome')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'confirm') {
+    return (
+      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+        <div className="flex items-center gap-2 mb-4">
+          <Button variant="ghost" size="sm" onClick={() => setStep('form')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h2 className="text-xl font-bold text-white">{t('send.confirm')}</h2>
+        </div>
+
+        <Card className="bg-gray-800 border-gray-700">
+          <CardContent className="px-4 space-y-4">
+            <div className="flex justify-between">
+              <span className="text-gray-400">{t('send.engraveFrom')}</span>
+              <span className="text-white font-mono text-sm">
+                {wallet.address.slice(0, 10)}...{wallet.address.slice(-10)}
+              </span>
+            </div>
+
+            <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30">
+              <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">{t('send.engraveContent')}:</p>
+              <DapMessageDisplay
+                content={engraveText}
+                buttonText={<>{t('dap.preview')}</>}
+                title={t('dap.preview')}
+                className="p-0 border-none bg-transparent"
+              />
+            </div>
+
+            <div className="space-y-2 border-t border-gray-600 pt-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.engraveLoss')}:</span>
+                <span className="text-white">
+                  {dapInfo?.dapAmount.toFixed(8)} {NAME_TOKEN}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.engraveNetworkFee')}:</span>
+                <span className="text-white">
+                  {networkFee.toFixed(8)} {NAME_TOKEN}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.engravePlatformFee')}:</span>
+                <span className="text-white">
+                  {appFee.toFixed(8)} {NAME_TOKEN}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex justify-between border-t border-gray-600 pt-3">
+              <span className="text-gray-400">{t('send.total')}:</span>
+              <div className="text-right">
+                <span className="text-white font-semibold">
+                  {totalFee.toFixed(8)} {NAME_TOKEN}
+                </span>
+                <p className="text-gray-400 text-sm">${calcValue(totalFee, coinPrice)} USD</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gray-800 border-gray-700">
+          <CardContent className="px-4 py-4 space-y-4">
+            <Label className="text-white flex items-center gap-2">
+              <Lock className="h-4 w-4" />
+              {t('send.confirmTransaction')}
+            </Label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                if (passwordError) setPasswordError('')
+              }}
+              placeholder={t('send.inputPassword')}
+              className="w-full bg-gray-700 border border-gray-600 text-white placeholder-gray-400 rounded-lg px-3 py-2 focus:outline-none focus:border-green-400"
+            />
+            {passwordError && <p className="text-red-400 text-sm">{passwordError}</p>}
+          </CardContent>
+        </Card>
+
+        <AlertDialog open={showConfirmDialog} onOpenChange={(open) => { if (!open) return; setShowConfirmDialog(open) }}>
+          <AlertDialogTrigger asChild>
+            <Button onClick={handlePasswordSubmit} disabled={!password} className="w-full bg-green-500 hover:bg-green-600 text-white h-12">
+              {t('send.confirmPay')}
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="bg-gray-800 border-gray-700">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">{t('send.confirm')}</AlertDialogTitle>
+              <AlertDialogDescription className="text-gray-300">
+                {t('send.confirmTransactionInfo')}
+                <br />
+                {t('send.total')}: {totalFee.toFixed(8)} {NAME_TOKEN}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleCancelTransaction} className="bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600">
+                {isCancelLoading ? <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div> : t('send.cancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmTransaction} className="bg-green-500 hover:bg-green-600 text-white">
+                {isConfirmLoading ? (
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                ) : (
+                  t('send.confirmTransactionOn')
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Button onClick={() => setStep('form')} variant="outline" className="w-full border-gray-600 text-gray-300 hover:bg-gray-700">
+          {t('send.backToEdit')}
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="px-4 space-y-4">
+          <div className="text-center py-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-3">
+              <MessageSquare className="h-8 w-8 text-white" />
+            </div>
+            <p className="text-gray-300 text-sm">{t('send.engraveDesc')}</p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label className="text-purple-400">{t('send.engraveText')}</Label>
+              {engraveText && (
+                <DapMessageDisplay
+                  content={engraveText}
+                  showPreview={false}
+                  buttonText={
+                    <>
+                      <Eye className="w-3 h-3 mr-1" />
+                      {t('dap.preview')}
+                    </>
+                  }
+                  title={t('dap.preview')}
+                  className="h-6 px-2 text-xs text-purple-400 hover:text-purple-300 hover:bg-purple-900/30"
+                />
+              )}
+            </div>
+            <textarea
+              value={engraveText}
+              onChange={(e) => setEngraveText(e.target.value)}
+              placeholder={t('send.engravePlaceholder')}
+              className="w-full bg-gray-900 text-white border border-gray-600 rounded-lg p-3 resize-none h-32 focus:outline-none focus:border-purple-400"
+            />
+            <div className="text-right text-xs text-gray-400">
+              {engraveText.length} {t('send.engraveChunkCount').toLowerCase()}
+            </div>
+          </div>
+
+          {dapInfo && (
+            <div className="bg-gray-900/50 rounded-lg p-3 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.engraveLoss')}:</span>
+                <span className="text-white">
+                  {dapInfo.dapAmount.toFixed(8)} {NAME_TOKEN}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.engraveChunkCount')}:</span>
+                <span className="text-white">{dapInfo.chunkCount}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.engraveNetworkFee')}:</span>
+                <span className="text-white">
+                  {networkFee.toFixed(8)} {NAME_TOKEN}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.engravePlatformFee')}:</span>
+                <span className="text-white">
+                  {appFee.toFixed(8)} {NAME_TOKEN}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold border-t border-gray-600 pt-2">
+                <span className="text-gray-300">{t('send.totalFee')}:</span>
+                <span className="text-white">
+                  {totalFee.toFixed(8)} {NAME_TOKEN}
+                </span>
+              </div>
+              <div className="text-right text-xs text-gray-400">≈ ${calcValue(totalFee, coinPrice)} USD</div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {totalFee > 0 && pickUnspents.length === 0 && (
+        <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-700 rounded-lg p-2">
+          {t('send.engraveInsufficient')}
+        </div>
+      )}
+
+      <Button
+        onClick={handleSendToConfirm}
+        disabled={!engraveText || !engraveText.trim() || pickUnspents.length === 0 || isLoading}
+        className="w-full bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white disabled:bg-gray-600 disabled:text-gray-400"
+      >
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+            <span>...</span>
+          </div>
+        ) : (
+          t('send.engraveButton')
+        )}
+      </Button>
+    </div>
+  )
+}

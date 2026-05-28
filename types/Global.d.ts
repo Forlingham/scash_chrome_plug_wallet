@@ -8,7 +8,12 @@ interface ApiData<T> {
 }
 
 // 节点连接信息：每次成功调用 RPC 都会附带，用于驱动 UI 信号强度展示。
+// status 字段由 wallet-store 维护（rpc-client 不直接写）：
+//   - 'checking'：尚未发起任何调用 / 正在调用中
+//   - 'connected'：最近一次调用成功
+//   - 'disconnected'：最近一次调用全部节点都失败
 interface NodeInfo {
+  status: 'connected' | 'checking' | 'disconnected'
   endpoint: string
   responseTime: number
 }

@@ -53,8 +53,8 @@ export interface PendingTransaction {
 // 钱包状态接口
 interface WalletState {
   blockchainInfo: BlockchainInfo
-  // 当前最近一次成功调用 RPC 的节点信息（host + 响应耗时）
-  nodeInfo: NodeInfo | null
+  // 当前最近一次调用 RPC 的节点信息（含连接状态、host、响应耗时）
+  nodeInfo: NodeInfo
   // Explorer 接口最近一次响应耗时（用于 UI 信号强度）
   explorerInfo: { endpoint: string; responseTime: number } | null
 
@@ -116,7 +116,7 @@ export const useWalletStore = create<WalletState>()(
         warnings: '',
         coinPrice: '0'
       },
-      nodeInfo: null,
+      nodeInfo: { status: 'checking', endpoint: '', responseTime: 0 },
       explorerInfo: null,
       wallet: {
         isHasWallet: false,
@@ -258,7 +258,13 @@ export const useWalletStore = create<WalletState>()(
             const fee = res.data.rpcData.feerate
             set((state) => {
               state.baseFee = fee
-              if (res.data.nodeInfo) state.nodeInfo = res.data.nodeInfo
+              if (res.data.nodeInfo) {
+                state.nodeInfo = {
+                  status: 'connected',
+                  endpoint: res.data.nodeInfo.endpoint,
+                  responseTime: res.data.nodeInfo.responseTime
+                }
+              }
             })
             return { isSuccess: true, status: 'remote', fee }
           }
@@ -280,20 +286,38 @@ export const useWalletStore = create<WalletState>()(
       },
 
       setUpdateBlockchaininfo: async () => {
+        // 进入 checking 态，UI 立即显示"检测中"
+        set((state) => {
+          if (state.nodeInfo.status !== 'connected') {
+            state.nodeInfo = { ...state.nodeInfo, status: 'checking' }
+          }
+        })
         try {
           const res = await getBlockchainInfoApi()
           if (res.data.success) {
             set((state) => {
-              // 用现有 coinPrice 兜底（避免覆盖已经获取到的币价）
               state.blockchainInfo = {
                 ...res.data.rpcData,
                 coinPrice: state.coinPrice
               }
-              if (res.data.nodeInfo) state.nodeInfo = res.data.nodeInfo
+              if (res.data.nodeInfo) {
+                state.nodeInfo = {
+                  status: 'connected',
+                  endpoint: res.data.nodeInfo.endpoint,
+                  responseTime: res.data.nodeInfo.responseTime
+                }
+              }
+            })
+          } else {
+            set((state) => {
+              state.nodeInfo = { status: 'disconnected', endpoint: '', responseTime: 0 }
             })
           }
         } catch (error) {
           console.log('获取当前节点状态 错误：', error)
+          set((state) => {
+            state.nodeInfo = { status: 'disconnected', endpoint: '', responseTime: 0 }
+          })
         }
       },
 
@@ -329,7 +353,13 @@ export const useWalletStore = create<WalletState>()(
               state.wallet.balance = resData.total_amount
               state.wallet.usableBalance = usableBalance.toNumber()
               state.wallet.lockBalance = lockBalance.toNumber()
-              if (res.data.nodeInfo) state.nodeInfo = res.data.nodeInfo
+              if (res.data.nodeInfo) {
+                state.nodeInfo = {
+                  status: 'connected',
+                  endpoint: res.data.nodeInfo.endpoint,
+                  responseTime: res.data.nodeInfo.responseTime
+                }
+              }
             })
             get().setUnspent(unspents)
           }

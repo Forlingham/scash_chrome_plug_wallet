@@ -1,13 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { useLanguage } from '@/contexts/language-context'
-import { ArrowUpDown, X, QrCode, ChevronRight, ArrowLeft, Lock, ExternalLink } from 'lucide-react'
-import { Checkbox } from '@/components/ui/checkbox'
+// 发送页面（升级版）
+// 与 web 钱包 components/wallet-send.tsx 同源，差异：
+//   - 使用 utils 提供的 getWalletPrivateKey，避免在组件里再造一次 BIP32 派生。
+//   - 不再依赖 process.env 测试网开关。
+
+import { QRScannerComponent } from '@/components/qr-scanner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,26 +17,33 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { useLanguage } from '@/contexts/language-context'
 import { useToast } from '@/hooks/use-toast'
+import { onBroadcastApi, Unspent } from '@/lib/api'
 import {
   calcAppFee,
   calcFee,
   calcValue,
   decryptWallet,
+  getDapInstance,
+  getWalletPrivateKey,
   hideString,
   NAME_TOKEN,
-  SCASH_NETWORK,
-  signTransaction,
-  validateScashAddress,
   onOpenExplorer,
-  sleep
+  signTransaction,
+  sleep,
+  validateScashAddress
 } from '@/lib/utils'
 import { PendingTransaction, useWalletActions, useWalletState } from '@/stores/wallet-store'
-import { getBaseFeeApi, getScantxoutsetApi, onBroadcastApi, Unspent } from '@/lib/api'
 import Decimal from 'decimal.js'
-import * as bip39 from 'bip39'
-import { BIP32Factory } from 'bip32'
-import * as ecc from 'tiny-secp256k1'
+import { ArrowUpDown, ChevronRight, ExternalLink, Lock, QrCode, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { DapMessageDisplay } from './dap-message-display'
 
 interface WalletSendProps {
   onNavigate: (view: string) => void
@@ -50,16 +55,9 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
   const { t } = useLanguage()
   const { toast } = useToast()
   const [step, setStep] = useState<'form' | 'confirm' | 'success'>('form')
-  // const [recipientAddress, setRecipientAddress] = useState('')
-  // const [sendAmount, setSendAmount] = useState('')
   const [isSliding, setIsSliding] = useState(false)
 
-  const [sendList, setSendList] = useState<SendList[]>([
-    {
-      address: '',
-      amount: ''
-    }
-  ])
+  const [sendList, setSendList] = useState<SendList[]>([{ address: '', amount: '' }])
   const [sendListConfirm, setSendListConfirm] = useState<SendList[]>([])
   const [sendAmount, setSendAmount] = useState<number>(0)
   const [sendAmountTotal, setSendAmountTotal] = useState<number>(0)
@@ -78,8 +76,14 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
   const [password, setPassword] = useState<string>('')
   const [passwordError, setPasswordError] = useState<string>('')
   const [showConfirmDialog, setShowConfirmDialog] = useState<boolean>(false)
-
+  const [showQRScanner, setShowQRScanner] = useState<boolean>(false)
+  const [currentScanIndex, setCurrentScanIndex] = useState<number>(0)
   const [currentPendingTransaction, setCurrentPendingTransaction] = useState<PendingTransaction>()
+
+  const [dapMessage, setDapMessage] = useState<string>('')
+  const [dapInfo, setDapInfo] = useState<DapOutputsResult | null>(null)
+  const [dapNetworkFee, setDapNetworkFee] = useState<number>(0)
+  const [totalFee, setTotalFee] = useState<number>(0)
 
   async function getInitData() {
     setIsLoading(true)
@@ -96,6 +100,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
   useEffect(() => {
     setUpdateBalanceByMemPool()
     getInitData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleChangeAddress = (index: number, value: string) => {
@@ -104,7 +109,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       newList[index].address = value
       return newList
     })
-    // 清除该输入框的错误状态
     if (addressErrors[index]) {
       setAddressErrors((prev) => {
         const newErrors = { ...prev }
@@ -126,11 +130,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       newList[index].amount = value
       return newList
     })
-
-    // 记录最后输入的输入框
     setLastAmountInputIndex(index)
-
-    // 清除该输入框的错误状态
     if (amountErrors[index]) {
       setAmountErrors((prev) => {
         const newErrors = { ...prev }
@@ -148,13 +148,11 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
   const validateAmount = (index: number, amount: string) => {
     const numAmount = parseFloat(amount)
     const walletBalance = parseFloat(wallet.usableBalance.toString())
-
     if (amount && !isNaN(numAmount) && numAmount > walletBalance) {
       setAmountErrors((prev) => ({ ...prev, [index]: true }))
     }
   }
 
-  // 验证总金额是否超出余额
   const validateTotalAmount = () => {
     const validSendList = sendList.filter((item) => {
       return item.address && validateScashAddress(item.address) && item.amount && Number.parseFloat(item.amount) > 0
@@ -164,9 +162,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     const fee = networkFee
 
     let requiredAmount = totalAmount
-    if (!deductFeeFromAmount) {
-      requiredAmount = requiredAmount.plus(fee)
-    }
+    if (!deductFeeFromAmount) requiredAmount = requiredAmount.plus(fee)
 
     if (requiredAmount.gt(availableBalance)) {
       setTotalAmountError(t('send.inputExceed'))
@@ -177,11 +173,9 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     }
   }
 
-  // 监听金额、手续费和开关状态变化，实时验证
   useEffect(() => {
-    if (sendList.some((item) => item.amount) && networkFee) {
-      validateTotalAmount()
-    }
+    if (sendList.some((item) => item.amount) && networkFee) validateTotalAmount()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sendList, networkFee, deductFeeFromAmount, wallet.usableBalance])
 
   useEffect(() => {
@@ -202,22 +196,16 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     ).toNumber()
     setSendAmount(_sendAmount)
 
-    // 计算需要多少个输入才能满足发送的金额
     let pickAmount = new Decimal(0)
     const pickUnspentsArr: Unspent[] = []
-    console.log(unspent, 'unspent')
-
     for (const unspentItem of unspent) {
-      if (unspentItem.isHasMemPool || !unspentItem.isUsable) {
-        continue
-      }
+      if (unspentItem.isHasMemPool || !unspentItem.isUsable) continue
       pickAmount = pickAmount.plus(new Decimal(unspentItem.amount))
-      console.log('pickAmount', pickAmount.toString(), 'sendAmount', _sendAmount)
-
       pickUnspentsArr.push(unspentItem)
-      if (pickAmount.gte(new Decimal(_sendAmount))) {
-        break
-      }
+      if (pickAmount.gte(new Decimal(_sendAmount))) break
+    }
+    if (dapInfo) {
+      pickAmount = pickAmount.plus(new Decimal(dapInfo.dapAmount).plus(new Decimal(dapNetworkFee)))
     }
     if (pickAmount.lt(_sendAmount)) {
       setTotalAmountError(t('send.inputExceed'))
@@ -225,33 +213,63 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     }
 
     setPickUnspents([...pickUnspentsArr])
-    console.log(pickUnspentsArr)
 
-    // 统计发送TX输入数量 - 使用本地变量而不是状态变量
     const inputCount = pickUnspentsArr.length
-    // 统计输出地址数量 (收款地址 + 找零地址)
     const outputCount = sendList.filter((item) => item.address).length + 5
 
-    // 计算app手续费
-    const appFee = calcAppFee(_sendAmount)
-    setAppFee(appFee)
+    const _appFee = calcAppFee(_sendAmount)
+    setAppFee(_appFee)
 
-    const _networkFee = new Decimal(appFee).plus(calcFee(inputCount, outputCount, baseFee).feeScash).toNumber()
+    const _networkFee = new Decimal(_appFee).plus(calcFee(inputCount, outputCount, baseFee).feeScash).toNumber()
     setNetworkFee(_networkFee)
 
-    // 如何输入的金额刚刚好，能和交易数据金额相等,或者输出的总金额添加上手续费大于总的输入金额，就需要强制从金额中扣除手续费，并且不需要找零地址
     if (pickAmount.eq(new Decimal(_sendAmount)) || new Decimal(_sendAmount).plus(networkFee).gte(new Decimal(pickAmount))) {
       setDeductFeeFromAmount(true)
       setIsForcedDeductFeeFromAmount(true)
     } else {
       setIsForcedDeductFeeFromAmount(false)
     }
-  }, [sendList])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sendList, dapInfo, dapNetworkFee])
 
-  const handleAddAddress = () => {
-    // Mock address book functionality
-    setSendList([...sendList, { address: '', amount: '' }])
-  }
+  // DAP 留言费用计算
+  useEffect(() => {
+    if (!dapMessage || !dapMessage.trim()) {
+      setDapInfo(null)
+      return
+    }
+    const dap = getDapInstance()
+    if (!dap) {
+      setDapInfo(null)
+      return
+    }
+    try {
+      const dapOutputs = dap.createDapOutputs(dapMessage.trim())
+      const dapAmount = dapOutputs.reduce((sum: number, output: { value: number }) => sum + output.value, 0) / 1e8
+      setDapInfo({
+        outputs: dapOutputs.map((output: { address: string; value: number }) => ({
+          address: output.address,
+          amount: (output.value / 1e8).toString()
+        })),
+        dapAmount,
+        chunkCount: dapOutputs.length
+      })
+      const feeResult = calcFee(0, dapOutputs.length, baseFee)
+      setDapNetworkFee(feeResult.feeScash)
+    } catch (error) {
+      console.error('创建 DAP 输出失败:', error)
+      setDapInfo(null)
+    }
+  }, [dapMessage, baseFee])
+
+  // 总手续费
+  useEffect(() => {
+    let total = networkFee
+    if (dapInfo) total = new Decimal(total).plus(dapInfo.dapAmount).plus(dapNetworkFee).toNumber()
+    setTotalFee(total)
+  }, [networkFee, dapInfo, dapNetworkFee])
+
+  const handleAddAddress = () => setSendList([...sendList, { address: '', amount: '' }])
 
   const handleSendToConfirm = () => {
     const validSendList = JSON.parse(
@@ -267,14 +285,16 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     }
     setStep('confirm')
 
+    let feeWithDap = networkFee
+    if (dapInfo) feeWithDap = new Decimal(feeWithDap).plus(dapInfo.dapAmount).toNumber()
+
     if (!deductFeeFromAmount) {
-      setSendAmountTotal(+new Decimal(sendAmount).add(networkFee).toFixed(8))
+      setSendAmountTotal(+new Decimal(sendAmount).add(feeWithDap).toFixed(8))
     } else {
-      // 如果从金额中减去手续费，就在最后一个地址减。需要判断金额够手续费不，不够就再向上找一个，全部不够就报错
       let lastIndex = validSendList.length - 1
       while (lastIndex >= 0) {
-        if (new Decimal(validSendList[lastIndex].amount || '0').gte(networkFee)) {
-          validSendList[lastIndex].amount = new Decimal(validSendList[lastIndex].amount || '0').minus(networkFee).toString()
+        if (new Decimal(validSendList[lastIndex].amount || '0').gte(feeWithDap)) {
+          validSendList[lastIndex].amount = new Decimal(validSendList[lastIndex].amount || '0').minus(feeWithDap).toString()
           break
         }
         lastIndex--
@@ -289,23 +309,48 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
     setSendListConfirm(validSendList)
   }
 
-  const handleScanQR = () => {
-    // Mock QR scanner functionality
-    toast({
-      title: 'QR Scanner',
-      description: 'QR scanner feature will be implemented soon'
-    })
+  const handleScanQR = (index: number) => {
+    setCurrentScanIndex(index)
+    setShowQRScanner(true)
+  }
+
+  const handleScanResult = (result: string) => {
+    try {
+      let address = result
+      let amount = ''
+      if (result.includes('?amount=')) {
+        const [addr, params] = result.split('?')
+        address = addr
+        const urlParams = new URLSearchParams(params)
+        amount = urlParams.get('amount') || ''
+      }
+      if (validateScashAddress(address)) {
+        setSendList((prev) => {
+          const newList = [...prev]
+          newList[currentScanIndex].address = address
+          if (amount) newList[currentScanIndex].amount = amount
+          return newList
+        })
+        setAddressErrors((prev) => {
+          const newErrors = { ...prev }
+          delete newErrors[currentScanIndex]
+          return newErrors
+        })
+        toast({ title: t('send.successScan'), description: t('send.successScanDesc'), variant: 'success' })
+      } else {
+        toast({ title: t('send.errorScan'), description: t('send.errorScanDesc'), variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('解析二维码失败:', error)
+      toast({ title: t('send.errorScan'), description: t('send.errorScanDesc'), variant: 'destructive' })
+    }
   }
 
   const handlePasswordSubmit = () => {
-    // 验证密码
     if (!password) {
       setPasswordError(t('wallet.lock.input'))
       return
     }
-
-    // 这里可以添加密码验证逻辑
-    // 假设密码正确，清除错误并显示确认弹窗
     setPasswordError('')
     setShowConfirmDialog(true)
   }
@@ -314,7 +359,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
 
   const handleConfirmTransaction = async () => {
     setIsConfirmLoading(true)
-    // password
     const walletObj = decryptWallet(wallet.encryptedWallet, password)
     if (!walletObj.isSuccess) {
       setPasswordError(t('wallet.lock.error'))
@@ -322,24 +366,19 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       setIsConfirmLoading(false)
       return
     }
-
     if (!walletObj.wallet) {
       setIsConfirmLoading(false)
       return
     }
 
-    const bip2 = BIP32Factory(ecc)
-    const seed = bip39.mnemonicToSeedSync(walletObj.wallet.mnemonic)
-    const root = bip2.fromSeed(seed, SCASH_NETWORK)
-    const path = "m/84'/0'/0'/0/0"
-    const child = root.derivePath(path)
-    const signTransactionResult = signTransaction(pickUnspents, sendListConfirm, networkFee, wallet.address, child, appFee)
+    const child = getWalletPrivateKey(walletObj.wallet.mnemonic)
+
+    let outputs = [...sendListConfirm]
+    if (dapInfo) outputs = [...outputs, ...dapInfo.outputs]
+    const feeRate = new Decimal(networkFee).add(dapNetworkFee).toNumber()
+    const signTransactionResult = signTransaction(pickUnspents, outputs, feeRate, wallet.address, child, appFee)
     if (!signTransactionResult.isSuccess) {
-      toast({
-        title: '签名失败',
-        description: '',
-        variant: 'destructive'
-      })
+      toast({ title: t('send.errorSign'), description: '', variant: 'destructive' })
       setIsConfirmLoading(false)
       return
     }
@@ -356,12 +395,18 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
         appFee: signTransactionResult.appFee
       })
 
-      if (!res.data.success && res.data.error) {
+      if (res.data.error) {
         toast({
           title: '错误码:' + res.data.error.error.code,
           description: res.data.error.error.message,
           variant: 'destructive'
         })
+        setIsConfirmLoading(false)
+        return
+      }
+
+      if (!res.data.rpcData.txid) {
+        toast({ title: t('send.error'), description: t('send.errorTxid'), variant: 'destructive' })
         setIsConfirmLoading(false)
         return
       }
@@ -373,8 +418,8 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
         totalOutput: signTransactionResult.totalOutput.toNumber(),
         change: signTransactionResult.change.toNumber(),
         feeRate: signTransactionResult.feeRate,
-        pickUnspents: pickUnspents,
-        sendListConfirm: sendListConfirm,
+        pickUnspents,
+        sendListConfirm: [...sendListConfirm],
         timestamp: Date.now(),
         status: 'pending'
       }
@@ -384,20 +429,25 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       setStep('success')
       setIsSliding(false)
       setPassword('')
+      toast({ title: t('send.success'), description: t('send.broadcast'), variant: 'success' })
+    } catch (error: any) {
+      console.log(error, 'error')
+      if (error?.data?.data?.success === false) {
+        toast({
+          title: t('send.error') + ': 500',
+          description: error?.data?.message || t('send.errorInfo'),
+          variant: 'destructive'
+        })
+        return
+      }
+      toast({ title: t('send.error'), description: t('send.errorInfo'), variant: 'destructive' })
+    } finally {
       setIsConfirmLoading(false)
-      toast({
-        title: t('send.success'),
-        description: t('send.broadcast'),
-        variant: 'success'
-      })
-    } catch (error) {
-      console.log(error)
-      setIsConfirmLoading(false)
+      setShowConfirmDialog(false)
     }
   }
 
   const [isCancelLoading, setIsCancelLoading] = useState<boolean>(false)
-
   const handleCancelTransaction = async () => {
     setIsCancelLoading(true)
     await sleep(1533)
@@ -410,20 +460,17 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
       <div className="flex-1 flex items-center justify-center p-4 min-h-screen">
         <div className="w-full max-w-md mx-auto">
           <div className="text-center space-y-6">
-            {/* Success Icon with purple logo-inspired styling */}
             <div className="relative">
               <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-purple-800 rounded-full flex items-center justify-center mx-auto shadow-2xl border-2 border-purple-400">
                 <ArrowUpDown className="h-10 w-10 text-white rotate-90" />
               </div>
             </div>
 
-            {/* Title */}
             <div className="space-y-2">
               <h2 className="text-3xl font-bold text-white tracking-tight">{t('send.success')}</h2>
               <p className="text-purple-300 text-sm">{t('send.broadcast')}</p>
             </div>
 
-            {/* Transaction Details */}
             {currentPendingTransaction && (
               <div className="space-y-4">
                 <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
@@ -439,7 +486,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                     </button>
                   </div>
                 </div>
-                {/* Amount Card */}
+
                 <div className="bg-gradient-to-r from-purple-900/50 to-purple-800/50 rounded-xl p-4 border border-purple-600/30 backdrop-blur-sm">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-white mb-1">
@@ -449,7 +496,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                   </div>
                 </div>
 
-                {/* Recipients */}
                 <div className="space-y-3">
                   {currentPendingTransaction?.sendListConfirm.map((item, index) => (
                     <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm" key={index}>
@@ -469,7 +515,18 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                   ))}
                 </div>
 
-                {/* Raw Transaction */}
+                {dapMessage && (
+                  <div className="bg-purple-900/30 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
+                    <p className="text-purple-300 text-xs uppercase tracking-wide mb-1">{t('send.message')}:</p>
+                    <DapMessageDisplay
+                      content={dapMessage}
+                      buttonText={<>{t('dap.preview')}</>}
+                      title={t('send.message')}
+                      className="p-0 border-none bg-transparent justify-center"
+                    />
+                  </div>
+                )}
+
                 <div className="bg-purple-950/50 rounded-lg p-3 border border-purple-600/30 backdrop-blur-sm">
                   <p className="text-purple-300 text-xs uppercase tracking-wide mb-2">{t('send.rawTransaction')}</p>
                   <div className="bg-black/50 rounded p-2 max-h-20 overflow-y-auto border border-purple-800/30">
@@ -479,7 +536,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               </div>
             )}
 
-            {/* Back Button */}
             <Button
               onClick={() => onNavigate('home')}
               className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white font-semibold py-3 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl border border-purple-500/50"
@@ -499,19 +555,9 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
           <h2 className="text-xl font-bold text-white mb-2">{t('send.confirm')}</h2>
         </div>
 
-        {/* Transaction Summary */}
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="px-4 space-y-4">
-            <div className="text-center">
-              {/* <div className="text-3xl font-bold text-white">
-                {sendList
-                  .filter((item) => item.address && item.amount)
-                  .reduce((acc, item) => acc + Number.parseFloat(item.amount || '0'), 0)}
-              </div> */}
-              {/* <div className="text-gray-400">
-              
-              </div> */}
-            </div>
+            <div className="text-center"></div>
 
             <div className="flex justify-between">
               <span className="text-gray-400">{t('send.from')}:</span>
@@ -528,7 +574,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                     {item.address.slice(0, 10)}...{item.address.slice(-10)}
                   </span>
                 </div>
-
                 <div className="flex justify-between">
                   <span className="text-gray-400">{t('send.amount')}:</span>
                   <span className="text-white font-mono text-sm">{item.amount}</span>
@@ -542,7 +587,16 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               </span>
             </div>
 
-            <div className="">
+            {dapInfo && (
+              <div className="flex justify-between border-t border-gray-600 pt-3">
+                <span className="text-gray-400">{t('send.messageFee') || 'Message fee'}:</span>
+                <span className="text-white flex items-center gap-2">
+                  {dapInfo.dapAmount} {NAME_TOKEN}
+                </span>
+              </div>
+            )}
+
+            <div>
               <div className="flex justify-between font-semibold">
                 <span className="text-gray-400">{t('send.total')}:</span>
                 <div className="text-right">
@@ -554,10 +608,21 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                 </div>
               </div>
             </div>
+
+            {dapMessage && (
+              <div className="bg-gray-900/50 rounded-lg p-3 mt-3">
+                <div className="text-gray-400 text-xs uppercase tracking-wide mb-1">{t('send.message') || 'Message'}:</div>
+                <DapMessageDisplay
+                  content={dapMessage}
+                  buttonText={<>{t('dap.preview')}</>}
+                  title={t('send.message')}
+                  className="p-0 border-none bg-transparent justify-center"
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Password Input */}
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="px-4 py-4 space-y-4">
             <Label className="text-white flex items-center gap-2">
@@ -578,15 +643,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
           </CardContent>
         </Card>
 
-        {/* Confirm Button with Dialog */}
-        <AlertDialog
-          open={showConfirmDialog}
-          onOpenChange={(open) => {
-            // 只允许通过代码控制关闭，不允许点击外部关闭
-            if (!open) return
-            setShowConfirmDialog(open)
-          }}
-        >
+        <AlertDialog open={showConfirmDialog} onOpenChange={(open) => { if (!open) return; setShowConfirmDialog(open) }}>
           <AlertDialogTrigger asChild>
             <Button
               onClick={handlePasswordSubmit}
@@ -600,7 +657,8 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
             <AlertDialogHeader>
               <AlertDialogTitle className="text-white">{t('send.confirm')}</AlertDialogTitle>
               <AlertDialogDescription className="text-gray-300">
-                {t('send.send')} {sendAmountTotal} {NAME_TOKEN}，{t('send.fee')} {networkFee} {NAME_TOKEN}。
+                {t('send.send')} {sendAmountTotal} {NAME_TOKEN}，{t('send.fee')} {networkFee} {NAME_TOKEN}
+                {dapInfo && `，${t('send.messageFee') || 'Message fee'} ${dapInfo.dapAmount} ${NAME_TOKEN}`}。
                 <br />
                 {t('send.confirmTransactionInfo')}
               </AlertDialogDescription>
@@ -641,7 +699,6 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
         </div>
       </div>
 
-      {/* Send To Address */}
       {sendList.map((item, index) => (
         <Card key={index} className="bg-gray-800 border-gray-700">
           <CardContent className="px-4 space-y-3">
@@ -668,7 +725,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                 </Button>
               )}
               <Button
-                onClick={handleScanQR}
+                onClick={() => handleScanQR(index)}
                 variant="ghost"
                 size="sm"
                 className="absolute right-1 top-1/2 transform -translate-y-1/2 text-green-400 hover:text-green-300"
@@ -677,7 +734,7 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               </Button>
             </div>
 
-            {addressErrors[index] && <div className="text-red-400 text-sm mt-1">地址格式错误，请检查输入的地址</div>}
+            {addressErrors[index] && <div className="text-red-400 text-sm mt-1">{t('send.invalidAddress')}</div>}
 
             <Label className="text-green-400">{t('common.amount')}:</Label>
 
@@ -710,16 +767,12 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
                   {t('send.amountExceed')} {wallet.usableBalance} {NAME_TOKEN}
                 </div>
               )}
-
-              <div className="text-center">
-                {/* <span className="text-gray-400">${(Number.parseFloat(sendAmount || '0') * 0.0138).toFixed(4)}</span> */}
-              </div>
             </div>
           </CardContent>
         </Card>
       ))}
 
-      {/* Add Another Address */}
+      {/* Add Another */}
       <Card className="bg-gray-800 border-gray-700 cursor-pointer hover:bg-gray-750" onClick={handleAddAddress}>
         <CardContent className="px-4">
           <div className="flex items-center justify-between">
@@ -757,18 +810,51 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
               onCheckedChange={(checked) => setDeductFeeFromAmount(checked === true)}
               className="w-4 h-4 min-w-4 max-w-4 min-h-4 max-h-4 flex-shrink-0 mr-3 border-2 border-gray-500 data-[state=unchecked]:border-gray-500 data-[state=unchecked]:bg-transparent"
             />
-
             <span className="text-gray-300 text-sm select-none">{t('send.feeDeducted')}</span>
           </label>
         </CardContent>
       </Card>
 
-      {/* Error Message */}
+      {/* DAP Message */}
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="px-4 space-y-3">
+          <div className="text-green-400">{t('send.message') || 'Message'}:</div>
+          <textarea
+            value={dapMessage}
+            onChange={(e) => setDapMessage(e.target.value)}
+            placeholder={t('send.messagePlaceholder') || 'Enter your message (optional)'}
+            className="w-full bg-gray-900 text-white border border-gray-600 rounded-lg p-3 resize-none h-24 focus:outline-none focus:border-green-400"
+          />
+
+          {dapInfo && (
+            <div className="space-y-2 bg-gray-900/50 rounded-lg p-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.messageFee') || 'Message fee'}:</span>
+                <span className="text-white">
+                  {dapInfo.dapAmount} {NAME_TOKEN} ({dapInfo.chunkCount} {dapInfo.chunkCount === 1 ? 'chunk' : 'chunks'})
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">{t('send.messageNetworkFee') || 'Message network fee'}:</span>
+                <span className="text-white">
+                  {dapNetworkFee} {NAME_TOKEN}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold">
+                <span className="text-gray-300">{t('send.totalFee') || 'Total fee'}:</span>
+                <span className="text-white">
+                  {totalFee} {NAME_TOKEN}
+                </span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {totalAmountError && (
         <div className="text-red-400 text-sm text-center bg-red-900/20 border border-red-700 rounded-lg p-2">{totalAmountError}</div>
       )}
 
-      {/* Continue Button */}
       <Button
         onClick={handleSendToConfirm}
         disabled={networkFee <= 0 || isLoading || !!totalAmountError}
@@ -783,6 +869,8 @@ export function WalletSend({ onNavigate }: WalletSendProps) {
           t('send.confirm')
         )}
       </Button>
+
+      <QRScannerComponent isOpen={showQRScanner} onClose={() => setShowQRScanner(false)} onScanResult={handleScanResult} />
     </div>
   )
 }

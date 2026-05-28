@@ -6,7 +6,21 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useLanguage } from '@/contexts/language-context'
-import { Lock, Key, Download, Globe, Shield, HelpCircle, LogOut, Eye, EyeOff, Copy, AlertTriangle, CheckCircle } from 'lucide-react'
+import {
+  Lock,
+  Key,
+  Download,
+  Globe,
+  Shield,
+  HelpCircle,
+  LogOut,
+  Eye,
+  EyeOff,
+  Copy,
+  AlertTriangle,
+  CheckCircle,
+  Server
+} from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 import { decryptWallet, downloadWalletFile, encryptWallet, passwordMD5, VERSION } from '@/lib/utils'
@@ -22,13 +36,15 @@ import {
   AlertDialogTrigger
 } from '@/components/ui/alert-dialog'
 import { useWalletStore, useWalletActions, type WalletInfo } from '@/stores/wallet-store'
+import { RpcNodesSettings } from '@/components/settings/rpc-nodes-settings'
+import { ExplorerSettings } from '@/components/settings/explorer-settings'
 
 interface WalletSettingsProps {
   onNavigate: (view: string) => void
   onLockWallet: () => void
 }
 
-type SettingsView = 'main' | 'changePassword' | 'backup' | 'security' | 'help'
+type SettingsView = 'main' | 'changePassword' | 'backup' | 'security' | 'help' | 'rpcNodes' | 'explorer'
 
 export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps) {
   const { t } = useLanguage()
@@ -48,43 +64,22 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
   const { setWallet } = useWalletActions()
   const [mockMnemonic, setMockMnemonic] = useState('')
 
-  // Mock mnemonic for backup
-
   const handlePasswordChange = () => {
     if (!passwords.current || !passwords.new || !passwords.confirm) {
-      toast({
-        title: t('common.error'),
-        description: t('settings.missingInformation'),
-        variant: 'destructive'
-      })
+      toast({ title: t('common.error'), description: t('settings.missingInformation'), variant: 'destructive' })
       return
     }
-
     if (passwords.new !== passwords.confirm) {
-      toast({
-        title: t('common.error'),
-        description: t('settings.passwordMismatch'),
-        variant: 'destructive'
-      })
+      toast({ title: t('common.error'), description: t('settings.passwordMismatch'), variant: 'destructive' })
       return
     }
-
     if (passwords.new.length < 8) {
-      toast({
-        title: t('common.error'),
-        description: t('settings.passwordTooShort'),
-        variant: 'destructive'
-      })
+      toast({ title: t('common.error'), description: t('settings.passwordTooShort'), variant: 'destructive' })
       return
     }
-
     const walletObj = decryptWallet(wallet.encryptedWallet, passwords.current)
     if (!walletObj.isSuccess) {
-      toast({
-        title: t('common.error'),
-        description: t('settings.passwordError'),
-        variant: 'destructive'
-      })
+      toast({ title: t('common.error'), description: t('settings.passwordError'), variant: 'destructive' })
       return
     }
     const passwordHash = passwordMD5(passwords.new)
@@ -102,45 +97,25 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       usableBalance: wallet.usableBalance,
       encryptedWallet: walletEncrypt
     }
-
-    // 保存到状态管理中 - 自动持久化到 localStorage
     setWallet(walletInfo)
-
-    // Mock password change
-    toast({
-      title: t('common.success'),
-      description: t('settings.passwordChanged')
-    })
-
+    toast({ title: t('common.success'), description: t('settings.passwordChanged') })
     setPasswords({ current: '', new: '', confirm: '' })
     setCurrentView('main')
   }
 
-  const handClickReveal = () => {
-    setShowPasswordDialog(true)
-  }
+  const handClickReveal = () => setShowPasswordDialog(true)
 
   const handlePasswordVerify = async () => {
     if (!verifyPassword.trim()) {
-      toast({
-        title: t('common.error'),
-        description: t('settings.inputPassword'),
-        variant: 'destructive'
-      })
+      toast({ title: t('common.error'), description: t('settings.inputPassword'), variant: 'destructive' })
       return
     }
-
     try {
       const walletObj = decryptWallet(wallet.encryptedWallet, verifyPassword)
       if (!walletObj.isSuccess) {
-        toast({
-          title: t('common.error'),
-          description: t('settings.passwordError'),
-          variant: 'destructive'
-        })
+        toast({ title: t('common.error'), description: t('settings.passwordError'), variant: 'destructive' })
         return
       }
-
       setShowMnemonic(true)
       setShowPasswordDialog(false)
       setVerifyPassword('')
@@ -156,24 +131,27 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
 
   const copyMnemonic = () => {
     navigator.clipboard.writeText(mockMnemonic)
-    toast({
-      title: 'Copied to Clipboard',
-      description: 'Recovery phrase has been copied to clipboard'
-    })
+    toast({ title: 'Copied to Clipboard', description: 'Recovery phrase has been copied to clipboard' })
   }
 
   const downloadBackup = () => {
     downloadWalletFile(wallet.encryptedWallet)
-
-    toast({
-      title: 'Backup Downloaded',
-      description: 'Your wallet backup has been downloaded successfully'
-    })
+    toast({ title: 'Backup Downloaded', description: 'Your wallet backup has been downloaded successfully' })
   }
 
   const onResetWallet = () => {
     localStorage.clear()
     window.location.reload()
+  }
+
+  // ===== 各子视图 =====
+
+  if (currentView === 'rpcNodes') {
+    return <RpcNodesSettings onBack={() => setCurrentView('main')} />
+  }
+
+  if (currentView === 'explorer') {
+    return <ExplorerSettings onBack={() => setCurrentView('main')} />
   }
 
   if (currentView === 'changePassword') {
@@ -234,11 +212,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         </Card>
 
         <div className="flex gap-3">
-          <Button
-            onClick={() => setCurrentView('main')}
-            variant="outline"
-            className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700"
-          >
+          <Button onClick={() => setCurrentView('main')} variant="outline" className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700">
             {t('common.cancel')}
           </Button>
           <Button
@@ -262,7 +236,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           <p className="text-gray-400 text-sm mt-2">Keep your recovery phrase and wallet file safe</p>
         </div>
 
-        {/* Recovery Phrase */}
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center gap-2">
@@ -307,16 +280,13 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           </CardContent>
         </Card>
 
-        {/* Download Backup */}
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="p-4 space-y-4">
             <div className="flex items-center gap-2">
               <Download className="h-5 w-5 text-green-500" />
               <h3 className="text-white font-medium">{t('settings.backupConfirmTitle')}</h3>
             </div>
-
             <p className="text-gray-400 text-sm">{t('settings.backupConfirmInfo')}</p>
-
             <Button onClick={downloadBackup} className="w-full bg-green-600 hover:bg-green-700 text-white">
               <Download className="h-4 w-4 mr-2" />
               {t('settings.backupConfirm')}
@@ -328,7 +298,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           {t('common.back')}
         </Button>
 
-        {/* Password Verification Dialog */}
         <AlertDialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
           <AlertDialogContent className="bg-gray-800 border-gray-700">
             <AlertDialogHeader>
@@ -352,9 +321,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
                   placeholder={t('settings.inputPassword')}
                   className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handlePasswordVerify()
-                    }
+                    if (e.key === 'Enter') handlePasswordVerify()
                   }}
                 />
               </div>
@@ -389,7 +356,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           <p className="text-gray-400 text-sm mt-2">Manage your wallet security preferences</p>
         </div>
 
-        {/* Security Status */}
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -418,7 +384,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           </CardContent>
         </Card>
 
-        {/* Security Actions */}
         <div className="space-y-3">
           <Button
             onClick={() => setCurrentView('changePassword')}
@@ -458,7 +423,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           <p className="text-gray-400 text-sm mt-2">Get help with your SCASH wallet</p>
         </div>
 
-        {/* Help Topics */}
         <div className="space-y-3">
           <Card className="bg-gray-800 border-gray-700">
             <CardContent className="p-4">
@@ -477,24 +441,14 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
               />
             </CardContent>
           </Card>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-4">
-              <h3 className="text-white font-medium mb-2">Troubleshooting</h3>
-              <p className="text-gray-400 text-sm">
-                Find solutions to common issues with transactions, wallet access, and technical problems.
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Contact Support */}
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="p-4 space-y-3">
             <h3 className="text-white font-medium">{t('common.contactSupport')}</h3>
             <p className="text-gray-400 text-sm">{t('common.contactSupportDesc')}</p>
             <div className="space-y-2">
-              <Button 
+              <Button
                 className="w-full bg-gray-700 hover:bg-gray-600 text-white"
                 onClick={() => window.open('https://github.com/Forlingham/scash_chrome_plug_wallet', '_blank')}
               >
@@ -504,7 +458,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
           </CardContent>
         </Card>
 
-        {/* App Info */}
         <Card className="bg-gray-800 border-gray-700">
           <CardContent className="p-4 text-center">
             <h3 className="text-white font-medium mb-2">{t('wallet.title')}</h3>
@@ -520,8 +473,23 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     )
   }
 
-  // Main settings view
+  // ===== Main settings view =====
+
+  // 把网络节点 / 浏览器配置入口放在最前面，因为这是新增的高频操作
   const settingsItems = [
+    {
+      icon: Server,
+      title: t('settings.rpcNodes'),
+      description: t('settings.rpcNodesInfo'),
+      action: () => setCurrentView('rpcNodes'),
+      highlight: true
+    },
+    {
+      icon: Globe,
+      title: t('settings.explorer'),
+      description: t('settings.explorerInfo'),
+      action: () => setCurrentView('explorer')
+    },
     {
       icon: Key,
       title: t('settings.changePassword'),
@@ -550,13 +518,15 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
 
   return (
     <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-      {/* Settings Items */}
       <div className="space-y-3">
         {settingsItems.map((item, index) => (
-          <Card key={index} className="bg-gray-800 border-gray-700 hover:bg-gray-750 cursor-pointer transition-colors">
+          <Card
+            key={index}
+            className={`bg-gray-800 border ${item.highlight ? 'border-purple-500/50' : 'border-gray-700'} hover:bg-gray-750 cursor-pointer transition-colors`}
+          >
             <CardContent className="px-4">
               <div className="flex items-center gap-4" onClick={item.action}>
-                <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center">
+                <div className={`w-10 h-10 ${item.highlight ? 'bg-purple-500/30' : 'bg-purple-600'} rounded-full flex items-center justify-center`}>
                   <item.icon className="h-5 w-5 text-white" />
                 </div>
                 <div className="flex-1">
@@ -569,7 +539,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         ))}
       </div>
 
-      {/* Action Buttons */}
       <div className="space-y-3 pt-4">
         <Button onClick={onLockWallet} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white">
           <Lock className="h-4 w-4 mr-2" />
@@ -607,7 +576,6 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         </AlertDialog>
       </div>
 
-      {/* Wallet Info */}
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="px-4">
           <div className="text-center space-y-3">
