@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "SCASH Wallet",
-  "version": "0.3.0",
-  "description": "A non-custodial cryptocurrency wallet for SCASH, built with Next.js. Securely manage your assets, sign transactions locally, and interact with the SCASH blockchain.",
+  "version": "0.4.0",
+  "description": "A non-custodial cryptocurrency wallet for SCASH. Connects directly to RPC nodes (built-in public node + your own nodes), with local signing and on-chain DAP messaging.",
   "action": {
     "default_popup": "index.html",
     "default_title": "Open SCASH Wallet",
@@ -22,6 +22,9 @@
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   },
+  "host_permissions": [
+    "https://explorer.scash.network/*"
+  ],
   "optional_host_permissions": [
     "https://*/*",
     "http://*/*"
