@@ -1,10 +1,14 @@
 'use client'
 
-// 区块浏览器 / 币价数据源 设置
-// 三个 URL：
-//   - explorerBaseUrl：富交易历史接口（lib/externalApi.ts 用）
-//   - coinPriceUrl：币价接口（lib/api.ts → getCoinPriceApi）
-//   - explorerWebUrl：区块浏览器站点本身（onOpenExplorer 跳转用）
+// 区块浏览器 / 币价数据源 设置（Chrome 插件桌面化重塑）
+// ----------------------------------------------------------------------
+// 业务行为完全保留：
+//   - explorerBaseUrl: 富交易历史接口（lib/externalApi.ts）
+//   - coinPriceUrl:    币价接口（lib/api.ts → getCoinPriceApi）
+//   - explorerWebUrl:  区块浏览器网站本身（onOpenExplorer 跳转）
+//
+// 视觉：移除手机风格的大居中图标头，改为紧凑的标题行 + 单卡设置项。
+// ----------------------------------------------------------------------
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -55,63 +59,89 @@ export function ExplorerSettings({ onBack }: ExplorerSettingsProps) {
   }
 
   return (
-    <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-      <div className="text-center mb-2">
-        <Globe className="h-12 w-12 text-purple-500 mx-auto mb-3" />
-        <h2 className="text-xl font-bold text-white">{t('settings.explorer')}</h2>
-        <p className="text-gray-400 text-sm mt-1">{t('settings.explorerInfo')}</p>
+    <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
+      {/* 紧凑标题区（替代大圆图标） */}
+      <div className="flex items-start gap-2.5">
+        <div className="w-8 h-8 rounded-md bg-emerald-500/10 ring-1 ring-emerald-500/30 flex items-center justify-center shrink-0">
+          <Globe className="h-4 w-4 text-emerald-400" />
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-zinc-100 leading-tight">
+            {t('settings.explorer')}
+          </h2>
+          <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+            {t('settings.explorerInfo')}
+          </p>
+        </div>
       </div>
 
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="px-4 py-4 space-y-4">
-          <div className="space-y-2">
-            <Label className="text-gray-300">{t('settings.explorer.api')}</Label>
-            <p className="text-xs text-gray-500">{t('settings.explorer.apiInfo')}</p>
-            <Input
-              value={explorerBase}
-              onChange={(e) => setExplorerBase(e.target.value)}
-              className="bg-gray-900 border-gray-700 text-white font-mono text-sm"
-              placeholder="https://explorer.scash.network/api/explorer"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-gray-300">{t('settings.explorer.price')}</Label>
-            <p className="text-xs text-gray-500">{t('settings.explorer.priceInfo')}</p>
-            <Input
-              value={priceUrl}
-              onChange={(e) => setPriceUrl(e.target.value)}
-              className="bg-gray-900 border-gray-700 text-white font-mono text-sm"
-              placeholder="https://explorer.scash.network/api/explorer/home/overview"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-gray-300">{t('settings.explorer.web')}</Label>
-            <p className="text-xs text-gray-500">{t('settings.explorer.webInfo')}</p>
-            <Input
-              value={webUrl}
-              onChange={(e) => setWebUrl(e.target.value)}
-              className="bg-gray-900 border-gray-700 text-white font-mono text-sm"
-              placeholder="https://explorer.scash.network/"
-            />
-          </div>
+      <Card>
+        <CardContent className="space-y-3">
+          <FieldGroup
+            label={t('settings.explorer.api')}
+            hint={t('settings.explorer.apiInfo')}
+            value={explorerBase}
+            onChange={setExplorerBase}
+            placeholder="https://explorer.scash.network/api/explorer"
+          />
+          <FieldGroup
+            label={t('settings.explorer.price')}
+            hint={t('settings.explorer.priceInfo')}
+            value={priceUrl}
+            onChange={setPriceUrl}
+            placeholder="https://explorer.scash.network/api/explorer/home/overview"
+          />
+          <FieldGroup
+            label={t('settings.explorer.web')}
+            hint={t('settings.explorer.webInfo')}
+            value={webUrl}
+            onChange={setWebUrl}
+            placeholder="https://explorer.scash.network/"
+          />
         </CardContent>
       </Card>
 
-      <div className="flex gap-3">
-        <Button onClick={handleReset} variant="outline" className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700">
-          <RefreshCw className="h-4 w-4 mr-2" />
+      <div className="flex gap-2">
+        <Button onClick={handleReset} variant="outline" size="sm" className="flex-1">
+          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
           {t('common.reset')}
         </Button>
-        <Button onClick={handleSave} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white">
+        <Button onClick={handleSave} variant="success" size="sm" className="flex-1">
           {t('common.save')}
         </Button>
       </div>
 
-      <Button onClick={onBack} variant="outline" className="w-full border-gray-600 text-gray-300 hover:bg-gray-700">
+      <Button onClick={onBack} variant="ghost" size="sm" className="w-full">
         {t('common.back')}
       </Button>
+    </div>
+  )
+}
+
+// 抽出的输入组：标签 + 提示 + 输入框，保持视觉一致
+function FieldGroup({
+  label,
+  hint,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  hint: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-zinc-300 text-xs">{label}</Label>
+      <p className="text-[10px] text-zinc-500 leading-relaxed">{hint}</p>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="font-mono text-[11px]"
+        placeholder={placeholder}
+      />
     </div>
   )
 }

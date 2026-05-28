@@ -1,11 +1,15 @@
 'use client'
 
-// 添加 / 编辑 RPC 节点对话框
-// 关键流程：
+// 添加 / 编辑 RPC 节点对话框（Chrome 插件桌面化重塑）
+// ----------------------------------------------------------------------
+// 业务流程完全保留：
 //   1. 用户填入 URL + Basic Auth 凭据
-//   2. 点击"测试连接"会先尝试请求 chrome.permissions.request 把目标 origin 加进
-//      扩展的 host_permissions（如果尚未授权），再发起一次 getblockchaininfo 调用。
-//   3. 测试通过即可保存；用户也可以直接保存（保存时也会请求权限）。
+//   2. "测试连接"前先 chrome.permissions.request 把 origin 加进 host_permissions，
+//      再 getblockchaininfo 验通
+//   3. 测试通过即可保存；保存时也会请求权限
+//
+// 视觉：替换 bg-gray-800/700 等硬编码为主题 token，按钮改 emerald/outline。
+// ----------------------------------------------------------------------
 
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -17,7 +21,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogTitle
+  DialogTitle,
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useLanguage } from '@/contexts/language-context'
@@ -51,7 +55,6 @@ async function ensurePermission(rawUrl: string): Promise<boolean> {
     return await chrome.permissions.request({ origins: [pattern] })
   } catch (e) {
     console.warn('chrome.permissions 调用失败:', e)
-    // 没拿到 API 时默认放行，避免开发态被拦截
     return true
   }
 }
@@ -112,7 +115,7 @@ export function RpcNodeEditDialog({ open, onOpenChange, node }: RpcNodeEditDialo
         url,
         user,
         password,
-        enabled: true
+        enabled: true,
       })
       setTestResult(r)
     } finally {
@@ -140,51 +143,57 @@ export function RpcNodeEditDialog({ open, onOpenChange, node }: RpcNodeEditDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-gray-700 sm:max-w-md">
+      <DialogContent className="sm:max-w-[340px]">
         <DialogHeader>
-          <DialogTitle className="text-white">{isEdit ? t('rpc.edit') : t('rpc.add')}</DialogTitle>
-          <DialogDescription className="text-gray-400">{t('rpc.editInfo')}</DialogDescription>
+          <DialogTitle className="text-sm">
+            {isEdit ? t('rpc.edit') : t('rpc.add')}
+          </DialogTitle>
+          <DialogDescription className="text-[11px]">
+            {t('rpc.editInfo')}
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label className="text-gray-300">{t('rpc.field.name')}</Label>
+        <div className="space-y-3 py-1">
+          <div className="space-y-1.5">
+            <Label className="text-zinc-300 text-xs">{t('rpc.field.name')}</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t('rpc.field.namePlaceholder')}
-              className="bg-gray-800 border-gray-700 text-white"
+              className="text-xs"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-gray-300">{t('rpc.field.url')}</Label>
+          <div className="space-y-1.5">
+            <Label className="text-zinc-300 text-xs">{t('rpc.field.url')}</Label>
             <Input
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="http://127.0.0.1:8342"
-              className="bg-gray-800 border-gray-700 text-white font-mono text-sm"
+              className="font-mono text-[11px]"
             />
-            {!isValidUrl && url && <p className="text-xs text-red-400">{t('rpc.field.urlInvalid')}</p>}
+            {!isValidUrl && url && (
+              <p className="text-[10px] text-red-400">{t('rpc.field.urlInvalid')}</p>
+            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-gray-300">{t('rpc.field.user')}</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">{t('rpc.field.user')}</Label>
               <Input
                 value={user}
                 onChange={(e) => setUser(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="text-xs"
                 autoComplete="off"
               />
             </div>
-            <div className="space-y-2">
-              <Label className="text-gray-300">{t('rpc.field.password')}</Label>
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">{t('rpc.field.password')}</Label>
               <Input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white"
+                className="text-xs"
                 autoComplete="new-password"
               />
             </div>
@@ -192,12 +201,18 @@ export function RpcNodeEditDialog({ open, onOpenChange, node }: RpcNodeEditDialo
 
           {testResult && (
             <div
-              className={`flex items-start gap-2 rounded-md p-3 text-sm ${
-                testResult.ok ? 'bg-green-900/30 text-green-300 border border-green-800/50' : 'bg-red-900/30 text-red-300 border border-red-800/50'
+              className={`flex items-start gap-1.5 rounded-md p-2 text-[11px] border ${
+                testResult.ok
+                  ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                  : 'bg-red-500/10 text-red-300 border-red-500/30'
               }`}
             >
-              {testResult.ok ? <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0" /> : <XCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />}
-              <div>
+              {testResult.ok ? (
+                <CheckCircle2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              ) : (
+                <XCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              )}
+              <div className="leading-relaxed">
                 {testResult.ok
                   ? `${t('rpc.testOk')} · chain=${testResult.chain} · ${testResult.responseTime}ms`
                   : `${t('rpc.testFail')}: ${testResult.message}`}
@@ -205,23 +220,30 @@ export function RpcNodeEditDialog({ open, onOpenChange, node }: RpcNodeEditDialo
             </div>
           )}
 
-          <p className="text-xs text-yellow-500/80">{t('rpc.securityNote')}</p>
+          <p className="text-[10px] text-amber-400/80 leading-relaxed">
+            {t('rpc.securityNote')}
+          </p>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" className="border-gray-700 text-gray-300 hover:bg-gray-800" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="gap-1.5 sm:gap-1.5 flex-row">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
             {t('common.cancel')}
           </Button>
           <Button
             variant="outline"
-            className="border-gray-700 text-gray-300 hover:bg-gray-800"
+            size="sm"
             disabled={!canSubmit || testing}
             onClick={handleTest}
           >
-            {testing ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
             {t('rpc.testConnection')}
           </Button>
-          <Button disabled={!canSubmit} onClick={handleSubmit} className="bg-purple-600 hover:bg-purple-700 text-white">
+          <Button
+            disabled={!canSubmit}
+            onClick={handleSubmit}
+            variant="success"
+            size="sm"
+          >
             {t('common.save')}
           </Button>
         </DialogFooter>
