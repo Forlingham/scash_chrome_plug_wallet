@@ -1,10 +1,13 @@
 'use client'
 
-// Markdown 渲染器 —— 用于 DAP 链上消息的安全展示
-// 直接从 web 钱包移植，关键安全要点：
+// Markdown 渲染器（Chrome 插件桌面化重塑）
+// 用于 DAP 链上消息的安全展示。
+// 关键安全要点（保持不变）：
 //   - rehype-sanitize 严格过滤 HTML
 //   - 链接点击需用户二次确认（防钓鱼）
 //   - 图片附 referrerPolicy="no-referrer"（防隐私泄露）
+//
+// 配色：链接 / 行内代码 / 强调 / 引用线 → 品牌色 purple；表格、HR 等结构色 → zinc。
 
 import dynamic from 'next/dynamic'
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
@@ -19,7 +22,7 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle
+  AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
 const ReactMarkdown = dynamic(() => import('react-markdown'))
@@ -38,10 +41,10 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
     () => ({
       ...defaultSchema,
       attributes: {
-        ...defaultSchema.attributes
-      }
+        ...defaultSchema.attributes,
+      },
     }),
-    []
+    [],
   )
 
   const handleLinkClick = (href: string) => {
@@ -71,33 +74,68 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
           rehypePlugins={[[rehypeSanitize, sanitizeSchema]]}
           remarkPlugins={[remarkGfm]}
           components={{
-            h1: ({ node, ...props }) => <h1 {...props} className="text-xl font-bold text-white mt-4 mb-2 border-b border-gray-700 pb-1" />,
-            h2: ({ node, ...props }) => <h2 {...props} className="text-lg font-bold text-white mt-3 mb-2" />,
-            h3: ({ node, ...props }) => <h3 {...props} className="text-base font-bold text-white mt-3 mb-1" />,
-            h4: ({ node, ...props }) => <h4 {...props} className="text-sm font-bold text-white mt-2 mb-1" />,
-            h5: ({ node, ...props }) => <h5 {...props} className="text-sm font-bold text-white mt-2 mb-1" />,
-            h6: ({ node, ...props }) => <h6 {...props} className="text-xs font-bold text-white mt-2 mb-1" />,
+            h1: ({ node, ...props }) => (
+              <h1
+                {...props}
+                className="text-base font-bold text-zinc-100 mt-3 mb-1.5 border-b border-zinc-800 pb-1"
+              />
+            ),
+            h2: ({ node, ...props }) => (
+              <h2 {...props} className="text-sm font-bold text-zinc-100 mt-3 mb-1.5" />
+            ),
+            h3: ({ node, ...props }) => (
+              <h3 {...props} className="text-sm font-bold text-zinc-100 mt-2 mb-1" />
+            ),
+            h4: ({ node, ...props }) => (
+              <h4 {...props} className="text-xs font-bold text-zinc-100 mt-2 mb-1" />
+            ),
+            h5: ({ node, ...props }) => (
+              <h5 {...props} className="text-xs font-bold text-zinc-100 mt-2 mb-1" />
+            ),
+            h6: ({ node, ...props }) => (
+              <h6 {...props} className="text-[11px] font-bold text-zinc-100 mt-2 mb-1" />
+            ),
             table: ({ node, ...props }) => (
-              <div className="overflow-x-auto my-4 rounded-lg border border-gray-700">
-                <table {...props} className="w-full text-left text-sm text-gray-300" />
+              <div className="overflow-x-auto my-3 rounded-md border border-zinc-800">
+                <table {...props} className="w-full text-left text-xs text-zinc-300" />
               </div>
             ),
-            thead: ({ node, ...props }) => <thead {...props} className="bg-gray-800 text-gray-200" />,
-            tbody: ({ node, ...props }) => <tbody {...props} className="divide-y divide-gray-700 bg-gray-900/50" />,
-            tr: ({ node, ...props }) => <tr {...props} className="hover:bg-gray-800/50 transition-colors" />,
-            th: ({ node, ...props }) => <th {...props} className="px-4 py-3 font-semibold whitespace-nowrap" />,
-            td: ({ node, ...props }) => <td {...props} className="px-4 py-3" />,
-            hr: ({ node, ...props }) => <hr {...props} className="my-4 border-gray-700" />,
-            strong: ({ node, ...props }) => <strong {...props} className="font-bold text-purple-300" />,
-            em: ({ node, ...props }) => <em {...props} className="italic text-gray-400" />,
-            del: ({ node, ...props }) => <del {...props} className="line-through text-gray-500" />,
-            p: ({ node, ...props }) => <p {...props} className="mb-2 last:mb-0 leading-relaxed" />,
-            ul: ({ node, ...props }) => <ul {...props} className="list-disc list-inside mb-2 pl-1 space-y-1" />,
-            ol: ({ node, ...props }) => <ol {...props} className="list-decimal list-inside mb-2 pl-1 space-y-1" />,
+            thead: ({ node, ...props }) => (
+              <thead {...props} className="bg-zinc-900 text-zinc-200" />
+            ),
+            tbody: ({ node, ...props }) => (
+              <tbody {...props} className="divide-y divide-zinc-800 bg-zinc-950/50" />
+            ),
+            tr: ({ node, ...props }) => (
+              <tr {...props} className="hover:bg-zinc-800/50 transition-colors" />
+            ),
+            th: ({ node, ...props }) => (
+              <th {...props} className="px-2.5 py-2 font-semibold whitespace-nowrap" />
+            ),
+            td: ({ node, ...props }) => <td {...props} className="px-2.5 py-2" />,
+            hr: ({ node, ...props }) => <hr {...props} className="my-3 border-zinc-800" />,
+            strong: ({ node, ...props }) => (
+              // 强调用 purple-300，与品牌色一致
+              <strong {...props} className="font-semibold text-purple-300" />
+            ),
+            em: ({ node, ...props }) => <em {...props} className="italic text-zinc-400" />,
+            del: ({ node, ...props }) => <del {...props} className="line-through text-zinc-500" />,
+            p: ({ node, ...props }) => (
+              <p {...props} className="mb-2 last:mb-0 leading-relaxed text-zinc-300" />
+            ),
+            ul: ({ node, ...props }) => (
+              <ul {...props} className="list-disc list-inside mb-2 pl-1 space-y-1 text-zinc-300" />
+            ),
+            ol: ({ node, ...props }) => (
+              <ol
+                {...props}
+                className="list-decimal list-inside mb-2 pl-1 space-y-1 text-zinc-300"
+              />
+            ),
             blockquote: ({ node, ...props }) => (
               <blockquote
                 {...props}
-                className="border-l-4 border-purple-500/50 pl-4 py-1 italic bg-gray-800/30 rounded-r my-2 text-gray-400"
+                className="border-l-2 border-purple-500/50 pl-3 py-1 italic bg-zinc-900/40 rounded-r my-2 text-zinc-400"
               />
             ),
             a: ({ node, href, ...props }) => (
@@ -116,7 +154,7 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
               if (isInline) {
                 return (
                   <code
-                    className="bg-gray-700/50 text-purple-200 rounded px-1.5 py-0.5 font-mono text-xs border border-gray-600/50"
+                    className="bg-zinc-800/80 text-purple-300 rounded px-1.5 py-0.5 font-mono text-[11px] border border-zinc-700/40"
                     {...props}
                   >
                     {children}
@@ -126,7 +164,7 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
               return (
                 <div className="relative group">
                   <code
-                    className="block bg-gray-900 border border-gray-700 rounded-lg p-3 font-mono text-xs text-gray-300 overflow-x-auto my-2 shadow-inner"
+                    className="block bg-zinc-950 border border-zinc-800 rounded-md p-2.5 font-mono text-[11px] text-zinc-300 overflow-x-auto my-2 leading-relaxed"
                     {...props}
                   >
                     {children}
@@ -143,12 +181,12 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
                 alt={alt || 'Blockchain content'}
                 loading="lazy"
                 referrerPolicy="no-referrer"
-                className="max-w-full h-auto rounded-lg border border-gray-700 my-2 max-h-[500px] object-contain bg-black/20"
+                className="max-w-full h-auto rounded-md border border-zinc-800 my-2 max-h-[400px] object-contain bg-zinc-950"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
                 }}
               />
-            )
+            ),
           }}
         >
           {children}
@@ -156,23 +194,21 @@ export function MarkdownRenderer({ children, className }: MarkdownRendererProps)
       </div>
 
       <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-        <AlertDialogContent className="bg-gray-800 border-gray-700 max-w-[90vw] w-full sm:max-w-lg rounded-xl shadow-2xl shadow-black/50">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">{t('common.externalLink')}</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-300">
+            <AlertDialogTitle className="text-sm">{t('common.externalLink')}</AlertDialogTitle>
+            <AlertDialogDescription className="text-[11px] leading-relaxed">
               {t('common.externalLinkInfo')}
-              <div className="mt-4 p-3 bg-black/30 rounded-lg border border-gray-700/50 break-all text-purple-400 font-mono text-xs max-h-24 overflow-y-auto">
+              <span className="block mt-2 p-2 bg-zinc-950 rounded-md border border-zinc-800/60 break-all text-purple-400 font-mono text-[10px] max-h-20 overflow-y-auto">
                 {targetUrl}
-              </div>
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-row gap-3 sm:gap-0 mt-4">
-            <AlertDialogCancel className="flex-1 bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 hover:text-white mt-0 transition-colors">
-              {t('common.cancel')}
-            </AlertDialogCancel>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirm}
-              className="flex-1 bg-purple-600 hover:bg-purple-700 text-white border-0 transition-colors"
+              className="bg-purple-600 text-white hover:bg-purple-500"
             >
               {t('common.continue')}
             </AlertDialogAction>

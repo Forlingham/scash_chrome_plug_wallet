@@ -1,5 +1,20 @@
 'use client'
 
+// 钱包设置（Chrome 插件桌面化重塑）
+// ----------------------------------------------------------------------
+// 业务行为完全保留：
+//   - 改密码（验旧密 → 解密钱包 → 用新密 hash 重加密 → 下载新文件）
+//   - 备份（验密 → 显示助记词 → 复制 / 下载加密文件）
+//   - 安全状态查看（加密、助记词隔离）
+//   - RPC 节点 / 区块浏览器子设置入口
+//   - 帮助 / 联系
+//   - 重置（清空 localStorage 但保留 RPC / 浏览器 / 语言偏好）
+//
+// 视觉：去掉每页的"大紫色图标头"，改为统一的 32px 紧凑标题；
+//      所有按钮 / 卡片走 token，重要 CTA 用品牌色 purple（default variant）；
+//      捐赠地址表格紧凑化，加复制反馈。
+// ----------------------------------------------------------------------
+
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -18,8 +33,10 @@ import {
   EyeOff,
   Copy,
   AlertTriangle,
-  CheckCircle,
-  Server
+  CheckCircle2,
+  Server,
+  ChevronRight,
+  Heart,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -33,7 +50,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger
 } from '@/components/ui/alert-dialog'
 import { useWalletStore, useWalletActions, type WalletInfo } from '@/stores/wallet-store'
 import { RpcNodesSettings } from '@/components/settings/rpc-nodes-settings'
@@ -44,7 +60,14 @@ interface WalletSettingsProps {
   onLockWallet: () => void
 }
 
-type SettingsView = 'main' | 'changePassword' | 'backup' | 'security' | 'help' | 'rpcNodes' | 'explorer'
+type SettingsView =
+  | 'main'
+  | 'changePassword'
+  | 'backup'
+  | 'security'
+  | 'help'
+  | 'rpcNodes'
+  | 'explorer'
 
 export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps) {
   const { t } = useLanguage()
@@ -55,7 +78,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
-    confirm: ''
+    confirm: '',
   })
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
@@ -66,20 +89,36 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
 
   const handlePasswordChange = () => {
     if (!passwords.current || !passwords.new || !passwords.confirm) {
-      toast({ title: t('common.error'), description: t('settings.missingInformation'), variant: 'destructive' })
+      toast({
+        title: t('common.error'),
+        description: t('settings.missingInformation'),
+        variant: 'destructive',
+      })
       return
     }
     if (passwords.new !== passwords.confirm) {
-      toast({ title: t('common.error'), description: t('settings.passwordMismatch'), variant: 'destructive' })
+      toast({
+        title: t('common.error'),
+        description: t('settings.passwordMismatch'),
+        variant: 'destructive',
+      })
       return
     }
     if (passwords.new.length < 8) {
-      toast({ title: t('common.error'), description: t('settings.passwordTooShort'), variant: 'destructive' })
+      toast({
+        title: t('common.error'),
+        description: t('settings.passwordTooShort'),
+        variant: 'destructive',
+      })
       return
     }
     const walletObj = decryptWallet(wallet.encryptedWallet, passwords.current)
     if (!walletObj.isSuccess) {
-      toast({ title: t('common.error'), description: t('settings.passwordError'), variant: 'destructive' })
+      toast({
+        title: t('common.error'),
+        description: t('settings.passwordError'),
+        variant: 'destructive',
+      })
       return
     }
     const passwordHash = passwordMD5(passwords.new)
@@ -95,7 +134,7 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       lockBalance: wallet.lockBalance,
       memPoolBalance: wallet.memPoolBalance,
       usableBalance: wallet.usableBalance,
-      encryptedWallet: walletEncrypt
+      encryptedWallet: walletEncrypt,
     }
     setWallet(walletInfo)
     toast({ title: t('common.success'), description: t('settings.passwordChanged') })
@@ -107,13 +146,21 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
 
   const handlePasswordVerify = async () => {
     if (!verifyPassword.trim()) {
-      toast({ title: t('common.error'), description: t('settings.inputPassword'), variant: 'destructive' })
+      toast({
+        title: t('common.error'),
+        description: t('settings.inputPassword'),
+        variant: 'destructive',
+      })
       return
     }
     try {
       const walletObj = decryptWallet(wallet.encryptedWallet, verifyPassword)
       if (!walletObj.isSuccess) {
-        toast({ title: t('common.error'), description: t('settings.passwordError'), variant: 'destructive' })
+        toast({
+          title: t('common.error'),
+          description: t('settings.passwordError'),
+          variant: 'destructive',
+        })
         return
       }
       setShowMnemonic(true)
@@ -124,30 +171,30 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       toast({
         title: t('common.error'),
         description: t('settings.verifyFailed'),
-        variant: 'destructive'
+        variant: 'destructive',
       })
     }
   }
 
   const copyMnemonic = () => {
     navigator.clipboard.writeText(mockMnemonic)
-    toast({ title: t('settings.copyMnemonicSuccess'), description: t('settings.copyMnemonicDesc') })
+    toast({
+      title: t('settings.copyMnemonicSuccess'),
+      description: t('settings.copyMnemonicDesc'),
+    })
   }
 
   const downloadBackup = () => {
     downloadWalletFile(wallet.encryptedWallet)
-    toast({ title: t('settings.backupDownloaded'), description: t('settings.backupDownloadedDesc') })
+    toast({
+      title: t('settings.backupDownloaded'),
+      description: t('settings.backupDownloadedDesc'),
+    })
   }
 
   const onResetWallet = () => {
-    // 修复 1: 重置时保留用户自己配置的 RPC 节点 / 区块浏览器 / 语言偏好。
-    //   用户期望：重置只清掉钱包身份和缓存数据，他们花时间配的 RPC 节点
-    //   不应该被一并清掉。
-    const PRESERVED_KEYS = [
-      'scash-rpc-config', // 用户配置的 RPC 节点列表
-      'scash-explorer-config', // 区块浏览器/币价 URL
-      'language-storage' // 用户选择的语言
-    ]
+    // 修复 1: 保留 RPC / 区块浏览器 / 语言偏好（用户期望重置只清钱包身份与缓存）
+    const PRESERVED_KEYS = ['scash-rpc-config', 'scash-explorer-config', 'language-storage']
     const preserved: Record<string, string | null> = {}
     for (const key of PRESERVED_KEYS) {
       preserved[key] = localStorage.getItem(key)
@@ -159,21 +206,18 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
       if (value !== null) localStorage.setItem(key, value)
     }
 
-    // 重新加载，让 zustand 持久化中间件按空数据初始化所有 store
     window.location.reload()
   }
 
   const handleConfirmReset = () => {
-    // 修复 2: 之前用 AlertDialogAction，第一次点击经常被 radix 内部
-    //   的 dialog 关闭逻辑吞掉，不触发 onClick；要点第二次才生效。
-    //   这里改成普通 Button + 显式关闭对话框，并用 setTimeout 让对话框
-    //   关闭的 state 更新先 commit，再触发 reload，避免 React 警告。
+    // 修复 2: setTimeout 让 dialog 关闭的 state commit 先完成再 reload，避免 React 警告
     setShowResetDialog(false)
     setTimeout(() => onResetWallet(), 0)
   }
 
-  // ===== 各子视图 =====
-
+  // ====================================================================
+  // 子视图：RPC / 浏览器 设置
+  // ====================================================================
   if (currentView === 'rpcNodes') {
     return <RpcNodesSettings onBack={() => setCurrentView('main')} />
   }
@@ -182,70 +226,78 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     return <ExplorerSettings onBack={() => setCurrentView('main')} />
   }
 
+  // ====================================================================
+  // 子视图：修改密码
+  // ====================================================================
   if (currentView === 'changePassword') {
     return (
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-        <div className="text-center mb-6">
-          <Key className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">{t('settings.changePassword')}</h2>
-          <p className="text-gray-400 text-sm mt-2">{t('settings.changePasswordInfo2')}</p>
-        </div>
+      <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
+        <SubHeader
+          icon={<Key className="h-4 w-4 text-purple-400" />}
+          title={t('settings.changePassword')}
+          description={t('settings.changePasswordInfo2')}
+        />
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-4 space-y-4">
-            <div>
-              <Label className="text-gray-300 text-sm">{t('settings.currentPassword')}</Label>
+        <Card>
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">
+                {t('settings.currentPassword')}
+              </Label>
               <div className="relative">
                 <Input
                   type={showPassword ? 'text' : 'password'}
                   value={passwords.current}
                   onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                  className="bg-gray-900 border-gray-600 text-white pr-10"
+                  className="pr-9 text-xs"
                   placeholder={t('settings.currentPassword')}
                 />
-                <Button
+                <button
                   type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 text-gray-400 hover:text-white"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-100"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide' : 'Show'}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
+                  {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
               </div>
             </div>
 
-            <div>
-              <Label className="text-gray-300 text-sm">{t('settings.newPassword')}</Label>
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">{t('settings.newPassword')}</Label>
               <Input
                 type={showPassword ? 'text' : 'password'}
                 value={passwords.new}
                 onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
-                className="bg-gray-900 border-gray-600 text-white"
+                className="text-xs"
                 placeholder={t('wallet.passwordInput')}
               />
             </div>
 
-            <div>
-              <Label className="text-gray-300 text-sm">{t('settings.confirmNewPassword')}</Label>
+            <div className="space-y-1.5">
+              <Label className="text-zinc-300 text-xs">
+                {t('settings.confirmNewPassword')}
+              </Label>
               <Input
                 type={showPassword ? 'text' : 'password'}
                 value={passwords.confirm}
                 onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                className="bg-gray-900 border-gray-600 text-white"
+                className="text-xs"
                 placeholder={t('settings.confirmNewPassword')}
               />
             </div>
           </CardContent>
         </Card>
 
-        <div className="flex gap-3">
-          <Button onClick={() => setCurrentView('main')} variant="outline" className="flex-1 border-gray-600 text-gray-300 hover:bg-gray-700">
+        <div className="flex gap-2">
+          <Button onClick={() => setCurrentView('main')} variant="outline" size="sm" className="flex-1">
             {t('common.cancel')}
           </Button>
           <Button
             onClick={handlePasswordChange}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+            variant="default"
+            size="sm"
+            className="flex-1"
             disabled={!passwords.current || !passwords.new || !passwords.confirm}
           >
             {t('settings.changePassword')}
@@ -255,40 +307,46 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     )
   }
 
+  // ====================================================================
+  // 子视图：备份
+  // ====================================================================
   if (currentView === 'backup') {
     return (
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-        <div className="text-center mb-6">
-          <Download className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">{t('settings.backup')}</h2>
-          <p className="text-gray-400 text-sm mt-2">{t('settings.backupSubtitle')}</p>
-        </div>
+      <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
+        <SubHeader
+          icon={<Download className="h-4 w-4 text-purple-400" />}
+          title={t('settings.backup')}
+          description={t('settings.backupSubtitle')}
+        />
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
-              <h3 className="text-white font-medium">{t('wallet.saveRecovery')}</h3>
+        <Card>
+          <CardContent className="space-y-2.5">
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <h3 className="text-xs text-zinc-100 font-medium">{t('wallet.saveRecovery')}</h3>
             </div>
 
             <div className="relative">
-              <div className={`grid grid-cols-3 gap-2 p-4 bg-gray-900 rounded-lg ${!showMnemonic ? 'blur-sm' : ''}`}>
+              <div
+                className={`grid grid-cols-3 gap-1 p-2.5 bg-zinc-950 rounded-md border border-zinc-800/60 ${
+                  !showMnemonic ? 'blur-sm select-none' : ''
+                }`}
+              >
                 {mockMnemonic.split(' ').map((word, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 bg-gray-800 rounded text-sm">
-                    <span className="text-gray-400 text-xs">{index + 1}.</span>
-                    <span className="text-white">{word}</span>
+                  <div
+                    key={index}
+                    className="flex items-center gap-1 px-1.5 py-1 bg-zinc-900 rounded text-[11px] border border-zinc-800/40"
+                  >
+                    <span className="text-zinc-500 text-[9px] font-mono">{index + 1}.</span>
+                    <span className="text-zinc-100">{word}</span>
                   </div>
                 ))}
               </div>
 
               {!showMnemonic && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <Button
-                    onClick={handClickReveal}
-                    variant="outline"
-                    className="border-purple-600 text-purple-400 hover:bg-purple-600 hover:text-white"
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
+                  <Button onClick={handClickReveal} variant="default" size="sm">
+                    <Eye className="h-3.5 w-3.5" />
                     {t('wallet.clickReveal')}
                   </Button>
                 </div>
@@ -296,63 +354,64 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
             </div>
 
             {showMnemonic && (
-              <Button
-                onClick={copyMnemonic}
-                variant="outline"
-                className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 bg-transparent"
-              >
-                <Copy className="h-4 w-4 mr-2" />
+              <Button onClick={copyMnemonic} variant="outline" size="sm" className="w-full">
+                <Copy className="h-3.5 w-3.5" />
                 {t('common.copy')}
               </Button>
             )}
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-4 space-y-4">
-            <div className="flex items-center gap-2">
-              <Download className="h-5 w-5 text-green-500" />
-              <h3 className="text-white font-medium">{t('settings.backupConfirmTitle')}</h3>
+        <Card>
+          <CardContent className="space-y-2.5">
+            <div className="flex items-center gap-1.5">
+              <Download className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+              <h3 className="text-xs text-zinc-100 font-medium">
+                {t('settings.backupConfirmTitle')}
+              </h3>
             </div>
-            <p className="text-gray-400 text-sm">{t('settings.backupConfirmInfo')}</p>
-            <Button onClick={downloadBackup} className="w-full bg-green-600 hover:bg-green-700 text-white">
-              <Download className="h-4 w-4 mr-2" />
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              {t('settings.backupConfirmInfo')}
+            </p>
+            <Button onClick={downloadBackup} variant="default" size="sm" className="w-full">
+              <Download className="h-3.5 w-3.5" />
               {t('settings.backupConfirm')}
             </Button>
           </CardContent>
         </Card>
 
-        <Button onClick={() => setCurrentView('main')} variant="outline" className="w-full border-gray-600 text-gray-300 hover:bg-gray-700">
+        <Button onClick={() => setCurrentView('main')} variant="ghost" size="sm" className="w-full">
           {t('common.back')}
         </Button>
 
         <AlertDialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-          <AlertDialogContent className="bg-gray-800 border-gray-700">
+          <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-white flex items-center gap-2">
-                <Lock className="h-5 w-5 text-purple-500" />
+              <AlertDialogTitle className="flex items-center gap-1.5 text-sm">
+                <Lock className="h-4 w-4 text-purple-400" />
                 {t('settings.verifyPassword')}
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-400">{t('settings.verifyPasswordInfo')}</AlertDialogDescription>
+              <AlertDialogDescription className="text-[11px]">
+                {t('settings.verifyPasswordInfo')}
+              </AlertDialogDescription>
             </AlertDialogHeader>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="verify-password" className="text-gray-300">
-                  {t('settings.password')}
-                </Label>
-                <Input
-                  id="verify-password"
-                  type="password"
-                  value={verifyPassword}
-                  onChange={(e) => setVerifyPassword(e.target.value)}
-                  placeholder={t('settings.inputPassword')}
-                  className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handlePasswordVerify()
-                  }}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="verify-password" className="text-zinc-300 text-xs">
+                {t('settings.password')}
+              </Label>
+              <Input
+                id="verify-password"
+                type="password"
+                value={verifyPassword}
+                onChange={(e) => setVerifyPassword(e.target.value)}
+                placeholder={t('settings.inputPassword')}
+                className="text-xs"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handlePasswordVerify()
+                }}
+                autoFocus
+              />
             </div>
 
             <AlertDialogFooter>
@@ -361,11 +420,13 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
                   setShowPasswordDialog(false)
                   setVerifyPassword('')
                 }}
-                className="bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600"
               >
                 {t('common.cancel')}
               </AlertDialogCancel>
-              <AlertDialogAction onClick={handlePasswordVerify} className="bg-purple-600 hover:bg-purple-700 text-white">
+              <AlertDialogAction
+                onClick={handlePasswordVerify}
+                className="bg-purple-600 text-white hover:bg-purple-500"
+              >
                 {t('common.verify')}
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -375,228 +436,261 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
     )
   }
 
+  // ====================================================================
+  // 子视图：安全
+  // ====================================================================
   if (currentView === 'security') {
     return (
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-        <div className="text-center mb-6">
-          <Shield className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">{t('settings.security.title')}</h2>
-          <p className="text-gray-400 text-sm mt-2">{t('settings.security.subtitle')}</p>
-        </div>
+      <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
+        <SubHeader
+          icon={<Shield className="h-4 w-4 text-purple-400" />}
+          title={t('settings.security.title')}
+          description={t('settings.security.subtitle')}
+        />
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-8 w-8 text-green-500" />
-                <div>
-                  <h3 className="text-white font-medium">{t('settings.security.encrypted')}</h3>
-                  <p className="text-gray-400 text-sm">{t('settings.security.encryptedDesc')}</p>
-                </div>
-              </div>
+        <Card>
+          <CardContent className="flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+            <div className="min-w-0">
+              <h3 className="text-xs text-zinc-100 font-medium leading-tight">
+                {t('settings.security.encrypted')}
+              </h3>
+              <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                {t('settings.security.encryptedDesc')}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CheckCircle className="h-8 w-8 text-green-500" />
-                <div>
-                  <h3 className="text-white font-medium">{t('settings.security.recoverySecured')}</h3>
-                  <p className="text-gray-400 text-sm">{t('settings.security.recoverySecuredDesc')}</p>
-                </div>
-              </div>
+        <Card>
+          <CardContent className="flex items-center gap-2.5">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+            <div className="min-w-0">
+              <h3 className="text-xs text-zinc-100 font-medium leading-tight">
+                {t('settings.security.recoverySecured')}
+              </h3>
+              <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">
+                {t('settings.security.recoverySecuredDesc')}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        <div className="space-y-3">
-          <Button
+        <div className="space-y-2">
+          <RowActionButton
+            icon={<Key className="h-3.5 w-3.5" />}
+            label={t('settings.changePassword')}
             onClick={() => setCurrentView('changePassword')}
-            className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 justify-start"
-          >
-            <Key className="h-4 w-4 mr-3" />
-            {t('settings.changePassword')}
-          </Button>
-
-          <Button
+          />
+          <RowActionButton
+            icon={<Download className="h-3.5 w-3.5" />}
+            label={t('settings.backup')}
             onClick={() => setCurrentView('backup')}
-            className="w-full bg-gray-800 hover:bg-gray-700 text-white border border-gray-600 justify-start"
+          />
+          <Button
+            onClick={onLockWallet}
+            variant="outline"
+            size="sm"
+            className="w-full justify-start gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
           >
-            <Download className="h-4 w-4 mr-3" />
-            {t('settings.backup')}
-          </Button>
-
-          <Button onClick={onLockWallet} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white justify-start">
-            <Lock className="h-4 w-4 mr-3" />
+            <Lock className="h-3.5 w-3.5" />
             {t('settings.lock')}
           </Button>
         </div>
 
-        <Button onClick={() => setCurrentView('main')} variant="outline" className="w-full border-gray-600 text-gray-300 hover:bg-gray-700">
+        <Button onClick={() => setCurrentView('main')} variant="ghost" size="sm" className="w-full">
           {t('common.back')}
         </Button>
       </div>
     )
   }
 
+  // ====================================================================
+  // 子视图：帮助
+  // ====================================================================
   if (currentView === 'help') {
     return (
-      <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-        <div className="text-center mb-6">
-          <HelpCircle className="h-12 w-12 text-purple-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white">{t('settings.help.title')}</h2>
-          <p className="text-gray-400 text-sm mt-2">{t('settings.help.subtitle')}</p>
-        </div>
+      <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
+        <SubHeader
+          icon={<HelpCircle className="h-4 w-4 text-purple-400" />}
+          title={t('settings.help.title')}
+          description={t('settings.help.subtitle')}
+        />
 
-        <div className="space-y-3">
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-4">
-              <div
-                className="text-gray-400 text-sm prose prose-sm max-w-none prose-invert"
-                dangerouslySetInnerHTML={{ __html: t('safety.instructions') }}
-              />
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-4">
-              <div
-                className="text-gray-400 text-sm prose prose-sm max-w-none prose-invert"
-                dangerouslySetInnerHTML={{ __html: t('Technical.Overview') }}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-4 space-y-3">
-            <h3 className="text-white font-medium">{t('common.contactSupport')}</h3>
-            <p className="text-gray-400 text-sm">{t('common.contactSupportDesc')}</p>
-            <div className="space-y-2">
-              <Button
-                className="w-full bg-gray-700 hover:bg-gray-600 text-white"
-                onClick={() => window.open('https://github.com/Forlingham/scash_chrome_plug_wallet', '_blank')}
-              >
-                {t('common.contactSupportGitHub')}
-              </Button>
-            </div>
+        <Card>
+          <CardContent>
+            <div
+              className="text-[11px] text-zinc-400 leading-relaxed prose prose-sm max-w-none prose-invert prose-p:my-1 prose-headings:text-zinc-200 prose-a:text-purple-400"
+              dangerouslySetInnerHTML={{ __html: t('safety.instructions') }}
+            />
           </CardContent>
         </Card>
 
-        <Card className="bg-gray-800 border-gray-700">
-          <CardContent className="p-4 text-center">
-            <h3 className="text-white font-medium mb-2">{t('wallet.title')}</h3>
-            <p className="text-gray-400 text-sm">Version {VERSION}</p>
-            <p className="text-gray-500 text-xs mt-1">{t('common.walletInfo')}</p>
+        <Card>
+          <CardContent>
+            <div
+              className="text-[11px] text-zinc-400 leading-relaxed prose prose-sm max-w-none prose-invert prose-p:my-1 prose-headings:text-zinc-200 prose-a:text-purple-400"
+              dangerouslySetInnerHTML={{ __html: t('Technical.Overview') }}
+            />
           </CardContent>
         </Card>
 
-        <Button onClick={() => setCurrentView('main')} variant="outline" className="w-full border-gray-600 text-gray-300 hover:bg-gray-700">
+        <Card>
+          <CardContent className="space-y-2">
+            <h3 className="text-xs text-zinc-100 font-medium">{t('common.contactSupport')}</h3>
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              {t('common.contactSupportDesc')}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() =>
+                window.open('https://github.com/Forlingham/scash_chrome_plug_wallet', '_blank')
+              }
+            >
+              {t('common.contactSupportGitHub')}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="text-center space-y-1">
+            <h3 className="text-xs text-zinc-100 font-medium">{t('wallet.title')}</h3>
+            <p className="text-[10px] text-zinc-500 font-mono">v{VERSION}</p>
+            <p className="text-[10px] text-zinc-600 leading-relaxed">{t('common.walletInfo')}</p>
+          </CardContent>
+        </Card>
+
+        <Button onClick={() => setCurrentView('main')} variant="ghost" size="sm" className="w-full">
           {t('common.back')}
         </Button>
       </div>
     )
   }
 
-  // ===== Main settings view =====
-
-  // 把网络节点 / 浏览器配置入口放在最前面，因为这是新增的高频操作
-  const settingsItems = [
+  // ====================================================================
+  // 主视图
+  // ====================================================================
+  const settingsItems: SettingsItem[] = [
     {
       icon: Server,
       title: t('settings.rpcNodes'),
       description: t('settings.rpcNodesInfo'),
       action: () => setCurrentView('rpcNodes'),
-      highlight: true
+      highlight: true,
     },
     {
       icon: Globe,
       title: t('settings.explorer'),
       description: t('settings.explorerInfo'),
-      action: () => setCurrentView('explorer')
+      action: () => setCurrentView('explorer'),
     },
     {
       icon: Key,
       title: t('settings.changePassword'),
       description: t('settings.changePasswordInfo'),
-      action: () => setCurrentView('changePassword')
+      action: () => setCurrentView('changePassword'),
     },
     {
       icon: Download,
       title: t('settings.backup'),
       description: t('settings.backupInfo'),
-      action: () => setCurrentView('backup')
+      action: () => setCurrentView('backup'),
     },
     {
       icon: Shield,
       title: t('settings.lock'),
       description: t('settings.lockInfo'),
-      action: () => setCurrentView('security')
+      action: () => setCurrentView('security'),
     },
     {
       icon: HelpCircle,
       title: t('settings.help'),
       description: t('settings.helpInfo'),
-      action: () => setCurrentView('help')
-    }
+      action: () => setCurrentView('help'),
+    },
   ]
 
   return (
-    <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-      <div className="space-y-3">
+    <div className="h-full overflow-y-auto px-3 py-3 space-y-3">
+      {/* 设置项列表 */}
+      <div className="space-y-1.5">
         {settingsItems.map((item, index) => (
-          <Card
+          <button
             key={index}
-            className={`bg-gray-800 border ${item.highlight ? 'border-purple-500/50' : 'border-gray-700'} hover:bg-gray-750 cursor-pointer transition-colors`}
+            onClick={item.action}
+            className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border bg-card text-left transition-colors hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              item.highlight ? 'border-purple-500/40' : 'border-border'
+            }`}
           >
-            <CardContent className="px-4">
-              <div className="flex items-center gap-4" onClick={item.action}>
-                <div className={`w-10 h-10 ${item.highlight ? 'bg-purple-500/30' : 'bg-purple-600'} rounded-full flex items-center justify-center`}>
-                  <item.icon className="h-5 w-5 text-white" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-white font-medium">{item.title}</h3>
-                  <p className="text-gray-400 text-sm">{item.description}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            <div
+              className={`w-8 h-8 rounded-md flex items-center justify-center shrink-0 ${
+                item.highlight
+                  ? 'bg-purple-500/15 ring-1 ring-purple-500/30'
+                  : 'bg-zinc-800'
+              }`}
+            >
+              <item.icon
+                className={`h-4 w-4 ${item.highlight ? 'text-purple-400' : 'text-zinc-300'}`}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xs text-zinc-100 font-medium leading-tight">{item.title}</h3>
+              <p className="text-[10px] text-zinc-500 mt-0.5 leading-relaxed truncate">
+                {item.description}
+              </p>
+            </div>
+            <ChevronRight className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+          </button>
         ))}
       </div>
 
-      <div className="space-y-3 pt-4">
-        <Button onClick={onLockWallet} className="w-full bg-yellow-600 hover:bg-yellow-700 text-white">
-          <Lock className="h-4 w-4 mr-2" />
+      {/* 锁仓 + 重置 */}
+      <div className="space-y-2 pt-1">
+        <Button
+          onClick={onLockWallet}
+          variant="outline"
+          size="sm"
+          className="w-full justify-center gap-2 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300"
+        >
+          <Lock className="h-3.5 w-3.5" />
           {t('settings.lock')}
         </Button>
 
         <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-          <Button variant="destructive" className="w-full" onClick={() => setShowResetDialog(true)}>
-            <LogOut className="h-4 w-4 mr-2" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full justify-center gap-2 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+            onClick={() => setShowResetDialog(true)}
+          >
+            <LogOut className="h-3.5 w-3.5" />
             {t('settings.reset')}
           </Button>
-          <AlertDialogContent className="bg-gray-900 border-gray-700">
+          <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-white flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
+              <AlertDialogTitle className="flex items-center gap-1.5 text-sm">
+                <AlertTriangle className="h-4 w-4 text-red-400" />
                 {t('settings.resetConfirmTitle')}
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-300">
+              <AlertDialogDescription className="text-[11px] leading-relaxed">
                 {t('settings.resetConfirm')}
-                <br />
-                <span className="text-red-400 font-medium mt-2 block">{t('settings.resetConfirmInfo')}</span>
-                <br />
-                <span className="text-gray-400 text-xs mt-1 block">{t('settings.resetPreserveNote')}</span>
+                <span className="block mt-2 text-red-300 font-medium">
+                  {t('settings.resetConfirmInfo')}
+                </span>
+                <span className="block mt-1.5 text-zinc-500 text-[10px]">
+                  {t('settings.resetPreserveNote')}
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
-                {t('common.cancel')}
-              </AlertDialogCancel>
-              <Button onClick={handleConfirmReset} className="bg-red-600 hover:bg-red-700 text-white">
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <Button
+                onClick={handleConfirmReset}
+                className="bg-red-500 text-white hover:bg-red-600"
+                size="sm"
+              >
                 {t('common.confirm')}
               </Button>
             </AlertDialogFooter>
@@ -604,47 +698,128 @@ export function WalletSettings({ onNavigate, onLockWallet }: WalletSettingsProps
         </AlertDialog>
       </div>
 
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="px-4">
-          <div className="text-center space-y-3">
-            <h3 className="text-white font-medium">{t('common.supportAuthor')}</h3>
-            <p className="text-gray-400 text-xs">{t('common.supportAuthorDesc')}</p>
-            <div className="space-y-2 text-left">
-              {[
-                { label: 'BTC', address: 'bc1qnvdrxs23t6ejuxjs6mswx7cez2rn80wrwjd0u8' },
-                { label: 'BNB', address: '0xD4dB57B007Ad386C2fC4d7DD146f5977c039Fefc' },
-                { label: 'USDT (BEP-20)', address: '0xD4dB57B007Ad386C2fC4d7DD146f5977c039Fefc' },
-                { label: 'SCASH', address: 'scash1qy48v7frkutlthqq7uqs8lk5fam24tghjdxqtf5' }
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between gap-2">
-                  <div className="flex-1">
-                    <p className="text-gray-300 text-xs font-medium mb-1">{item.label}:</p>
-                    <p className="text-gray-400 text-xs font-mono break-all">{item.address}</p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-700"
-                    onClick={() => {
-                      navigator.clipboard.writeText(item.address)
-                      toast({
-                        title: t('common.copySuccess'),
-                        description: `${item.label} ${t('common.addressCopied')}`,
-                        duration: 2000
-                      })
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <p className="text-gray-500 text-xs">
-              {t('wallet.title')} {VERSION}
-            </p>
+      {/* 捐赠区 */}
+      <Card>
+        <CardContent className="space-y-2.5">
+          <div className="flex items-center gap-1.5">
+            <Heart className="h-3.5 w-3.5 text-rose-400 shrink-0" />
+            <h3 className="text-xs text-zinc-100 font-medium">{t('common.supportAuthor')}</h3>
           </div>
+          <p className="text-[10px] text-zinc-500 leading-relaxed">
+            {t('common.supportAuthorDesc')}
+          </p>
+          <div className="space-y-1.5">
+            {[
+              { label: 'BTC', address: 'bc1qnvdrxs23t6ejuxjs6mswx7cez2rn80wrwjd0u8' },
+              { label: 'BNB', address: '0xD4dB57B007Ad386C2fC4d7DD146f5977c039Fefc' },
+              { label: 'USDT (BEP-20)', address: '0xD4dB57B007Ad386C2fC4d7DD146f5977c039Fefc' },
+              { label: 'SCASH', address: 'scash1qy48v7frkutlthqq7uqs8lk5fam24tghjdxqtf5' },
+            ].map((item, index) => (
+              <DonateRow
+                key={index}
+                label={item.label}
+                address={item.address}
+                onCopy={() => {
+                  navigator.clipboard.writeText(item.address)
+                  toast({
+                    title: t('common.copySuccess'),
+                    description: `${item.label} ${t('common.addressCopied')}`,
+                    duration: 2000,
+                  })
+                }}
+              />
+            ))}
+          </div>
+          <p className="text-[10px] text-zinc-600 text-center pt-1">
+            {t('wallet.title')} <span className="font-mono">v{VERSION}</span>
+          </p>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+// ============================================================
+// 内部小组件
+// ============================================================
+
+interface SettingsItem {
+  icon: React.ComponentType<{ className?: string }>
+  title: string
+  description: string
+  action: () => void
+  highlight?: boolean
+}
+
+function SubHeader({
+  icon,
+  title,
+  description,
+}: {
+  icon: React.ReactNode
+  title: string
+  description: string
+}) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <div className="w-8 h-8 rounded-md bg-purple-500/10 ring-1 ring-purple-500/30 flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-zinc-100 leading-tight">{title}</h2>
+        <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed">{description}</p>
+      </div>
+    </div>
+  )
+}
+
+function RowActionButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <Button
+      onClick={onClick}
+      variant="outline"
+      size="sm"
+      className="w-full justify-start gap-2"
+    >
+      {icon}
+      {label}
+    </Button>
+  )
+}
+
+function DonateRow({
+  label,
+  address,
+  onCopy,
+}: {
+  label: string
+  address: string
+  onCopy: () => void
+}) {
+  return (
+    <div className="flex items-start justify-between gap-2 px-2 py-1.5 rounded-md bg-zinc-950/50 border border-zinc-800/40">
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] text-zinc-300 font-medium uppercase tracking-wide">{label}</p>
+        <p className="text-[10px] text-zinc-500 font-mono break-all leading-relaxed mt-0.5">
+          {address}
+        </p>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={onCopy}
+        aria-label={`Copy ${label}`}
+      >
+        <Copy className="h-3.5 w-3.5" />
+      </Button>
     </div>
   )
 }
